@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"net"
 	"os"
 )
@@ -22,12 +23,32 @@ func main() {
 	}
 
 	conn, err := l.Accept()
+
 	if err != nil {
 		fmt.Println("Error accepting connection: ", err.Error())
 		os.Exit(1)
 	}
 
-	_, err = conn.Write([]byte("+PONG\r\n"))
+	defer conn.Close()
+
+	for {
+		args := make([]byte, 1024)
+		_, err = conn.Read(args)
+
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			fmt.Println("Failed to read data: ", err.Error())
+			os.Exit(1)
+		}
+		_, err = conn.Write([]byte("+PONG\r\n"))
+
+		if err != nil {
+			fmt.Println("Failed to read data: ", err.Error())
+			os.Exit(1)
+		}
+	}
 
 	if err != nil {
 		fmt.Println("Failed to handle connection: ", err.Error())

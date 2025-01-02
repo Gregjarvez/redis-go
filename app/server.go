@@ -2,55 +2,126 @@ package main
 
 import (
 	"fmt"
-	"io"
+	"log"
 	"net"
 	"os"
+	"os/signal"
+	"sync"
+	"syscall"
+	"time"
 )
 
 // Ensures gofmt doesn't remove the "net" and "os" imports in stage 1 (feel free to remove this!)
 var _ = net.Listen
 var _ = os.Exit
 
+type Server struct {
+	wg         sync.WaitGroup
+	listAddr   string
+	listener   net.Listener
+	shutdown   chan struct{}
+	connection chan net.Conn
+}
+
 func main() {
 	// You can use print statements as follows for debugging, they'll be visible when running tests.
 	fmt.Println("Logs from your program will appear here!")
 
-	l, err := net.Listen("tcp", "0.0.0.0:6379")
+	server, err := NewTcpServer("0.0.0.0:6379")
 
 	if err != nil {
-		fmt.Println("Failed to bind to port 6379")
-		os.Exit(1)
+		log.Fatal(err)
 	}
 
-	for {
-		conn, err := l.Accept()
+	server.Start()
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-		if err != nil {
-			fmt.Println("Error accepting connection: ", err.Error())
-			os.Exit(1)
-		}
+	<-sigChan
 
-		go handleRequest(conn)
+	fmt.Println("Shutting down server...")
+	server.Stop()
+	fmt.Println("Server stopped.")
+
+}
+
+func NewTcpServer(listAddr string) (*Server, error) {
+	ln, err := net.Listen("tcp", listAddr)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &Server{
+		listAddr:   listAddr,
+		listener:   ln,
+		connection: make(chan net.Conn),
+		shutdown:   make(chan struct{}),
+	}, nil
+}
+
+func (s *Server) Start() {
+	s.wg.Add(2)
+	go s.acceptConnections()
+	go s.handleConnections()
+}
+
+func (s *Server) Stop() {
+	close(s.shutdown)
+	s.listener.Close()
+
+	done := make(chan struct{})
+	go func() {
+		s.wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		return
+	case <-time.After(time.Second):
+		fmt.Println("Timed out waiting for connections to finish.")
+		return
 	}
 }
 
-func handleRequest(conn net.Conn) {
+func (s *Server) acceptConnections() {
+	defer s.wg.Done()
 	for {
-		args := make([]byte, 1024)
-		_, err := conn.Read(args)
-
-		if err != nil {
-			if err == io.EOF {
-				break
+		select {
+		case <-s.shutdown:
+			fmt.Println("Server shutting down...")
+			return
+		default:
+			conn, err := s.listener.Accept()
+			if err != nil {
+				continue
 			}
-			fmt.Println("Failed to read data: ", err.Error())
-			os.Exit(1)
+			s.connection <- conn
 		}
+	}
+}
 
-		_, err = conn.Write([]byte("+PONG\r\n"))
+func (s *Server) handleConnections() {
+	defer s.wg.Done()
 
-		if err != nil {
-			fmt.Println("Failed to write response: ", err.Error())
+	for {
+		select {
+		case <-s.shutdown:
+			fmt.Println("Server shutting down...")
+			return
+		case conn := <-s.connection:
+			go s.handleConnection(conn)
+		default:
+			// do nothing
 		}
+	}
+}
+
+func (s *Server) handleConnection(conn net.Conn) {
+	_, err := conn.Write([]byte("+PONG\r\n"))
+
+	if err != nil {
+		fmt.Println(err)
 	}
 }

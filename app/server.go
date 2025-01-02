@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"log"
 	"net"
@@ -34,6 +35,7 @@ func main() {
 	}
 
 	server.Start()
+
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
@@ -90,7 +92,6 @@ func (s *Server) acceptConnections() {
 	for {
 		select {
 		case <-s.shutdown:
-			fmt.Println("Server shutting down...")
 			return
 		default:
 			conn, err := s.listener.Accept()
@@ -108,7 +109,6 @@ func (s *Server) handleConnections() {
 	for {
 		select {
 		case <-s.shutdown:
-			fmt.Println("Server shutting down...")
 			return
 		case conn := <-s.connection:
 			go s.handleConnection(conn)
@@ -119,9 +119,17 @@ func (s *Server) handleConnections() {
 }
 
 func (s *Server) handleConnection(conn net.Conn) {
-	_, err := conn.Write([]byte("+PONG\r\n"))
+	defer conn.Close()
 
-	if err != nil {
-		fmt.Println(err)
+	for {
+		message, err := bufio.NewReader(conn).ReadString('\n')
+
+		if err != nil {
+			return
+		}
+
+		fmt.Print("Connection data", " address", conn.RemoteAddr().String(), " message ", string(message))
+
+		conn.Write([]byte("+PONG\r\n"))
 	}
 }

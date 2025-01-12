@@ -1,8 +1,11 @@
 package main
 
 import (
-	"bufio"
+	"bytes"
 	"fmt"
+	"github.com/codecrafters-io/redis-starter-go/app/commands"
+	"github.com/codecrafters-io/redis-starter-go/app/commands/resp"
+	"io"
 	"log"
 	"net"
 	"os"
@@ -121,15 +124,50 @@ func (s *Server) handleConnections() {
 func (s *Server) handleConnection(conn net.Conn) {
 	defer conn.Close()
 
-	for {
-		message, err := bufio.NewReader(conn).ReadString('\n')
+	var content bytes.Buffer
+	buf := make([]byte, 256)
 
+	for {
+		n, err := conn.Read(buf)
 		if err != nil {
+			if err == io.EOF {
+				fmt.Println("Client disconnected")
+				break
+			}
+			fmt.Println("Read error:", err)
 			return
 		}
 
-		fmt.Print("Connection data", " address", conn.RemoteAddr().String(), " message ", string(message))
+		content.Write(buf[:n])
 
-		conn.Write([]byte("+PONG\r\n"))
+		for {
+			value, _, err := resp.NewReader(&content).ReadValue()
+			if err != nil {
+				break
+			}
+
+			// Process the command
+			com, err := commands.NewCommand(value)
+			if err != nil {
+				conn.Write([]byte(fmt.Sprintf("-ERR %v\r\n", err.Error())))
+				continue
+			}
+
+			result, execErr := com.Execute(commands.DefaultHandlers)
+			if execErr != nil {
+				conn.Write([]byte(fmt.Sprintf("-ERR %v\r\n", execErr.Error())))
+				continue
+			}
+
+			rp, marshalErr := result.Marshal()
+			if marshalErr != nil {
+				conn.Write([]byte(fmt.Sprintf("-ERR %v\r\n", marshalErr.Error())))
+				continue
+			}
+
+			// Send the response
+			conn.Write(rp)
+			content.Reset()
+		}
 	}
 }

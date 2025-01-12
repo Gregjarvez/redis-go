@@ -1,4 +1,18 @@
 {
     "editor.formatOnSave": true,
-    "go.imports.params": ""
+    "go.imports.params": "",
+    "plugins": [
+        {
+            "type": "add",
+            "pluginName": "fleet.ai"
+        },
+        {
+            "type": "add",
+            "pluginName": "fleet.aiCompletion"
+        },
+        {
+            "type": "add",
+            "pluginName": "fleet.go.ai"
+        }
+    ]
 }

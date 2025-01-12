@@ -1,0 +1,369 @@
+package resp
+
+import (
+	"bytes"
+	"errors"
+	"github.com/stretchr/testify/assert"
+	"testing"
+)
+
+func TestRespReader_ReadSimpleValue(t *testing.T) {
+	// Define test cases
+	tests := []struct {
+		name     string
+		input    string
+		size     int
+		expected Value
+		isNil    bool
+	}{
+		{
+			name:  "SimpleString",
+			input: "+OK\r\n",
+			expected: Value{
+				typ: SimpleString,
+				Raw: []byte("OK"),
+			},
+			size:  5,
+			isNil: false,
+		},
+		{
+			name:  "Error",
+			input: "-This is an error\r\n",
+			expected: Value{
+				typ: SimpleError,
+				Raw: []byte("This is an error"),
+			},
+			size:  19,
+			isNil: false,
+		},
+		{
+			name:  "Null",
+			input: "_\r\n",
+			expected: Value{
+				typ:   Null,
+				IsNil: true,
+			},
+			size:  0,
+			isNil: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a new RespReader with the test input
+			reader := NewReader(bytes.NewBufferString(tt.input))
+
+			// Read the value
+			value, n, err := reader.ReadValue()
+
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
+			// Check if the value is nil
+			if value.IsNil != tt.isNil {
+				t.Errorf("Expected IsNil = %v, got %v", tt.isNil, value.IsNil)
+			}
+
+			// Check the type
+			if value.Type() != tt.expected.typ {
+				t.Errorf("Expected RespDataType = %v, got %v", tt.expected.typ, value.Type())
+			}
+
+			// Check the raw value
+			if string(value.Raw) != string(tt.expected.Raw) {
+				t.Errorf("Expected Raw = %s, got %s", tt.expected.Raw, value.Raw)
+			}
+
+			if n != tt.size {
+				t.Errorf("Expected size = %d, got %d", tt.size, n)
+			}
+		})
+	}
+}
+
+func TestReader_ReadIntegerValue(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		size     int
+		expected Value
+		isNil    bool
+	}{
+		{
+			name:  "Integer",
+			input: ":12345\r\n",
+			expected: Value{
+				typ: Integer,
+				Raw: []byte("12345"),
+			},
+			size:  8,
+			isNil: false,
+		},
+		{
+			name:  "Negative Integer",
+			input: ":-12345\r\n",
+			expected: Value{
+				typ: Integer,
+				Raw: []byte("-12345"),
+			},
+			size:  9,
+			isNil: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reader := NewReader(bytes.NewBufferString(tt.input))
+			value, _, err := reader.ReadValue()
+
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
+			if value.Type() != tt.expected.typ {
+				t.Errorf("Expected RespDataType = %v, got %v", tt.expected.typ, value.Type())
+			}
+
+			if string(value.Raw) != string(tt.expected.Raw) {
+				t.Errorf("Expected Raw = %s, got %s", tt.expected.Raw, value.Raw)
+			}
+		})
+	}
+}
+
+func TestReader_ReadBulkStringValue(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		size     int
+		expected Value
+		isNil    bool
+	}{
+		{
+			name:  "BulkString",
+			input: "$12\r\nHello World\r\n",
+			expected: Value{
+				typ:   BulkString,
+				Raw:   []byte("Hello World"),
+				IsNil: false,
+			},
+			size:  15,
+			isNil: false,
+		},
+		{
+			name:  "Empty BulkString",
+			input: "$0\r\n\r\n",
+			expected: Value{
+				typ:   Null,
+				Raw:   []byte(""),
+				IsNil: true,
+			},
+			size:  3,
+			isNil: true,
+		},
+		{
+			name:  "BulkString with Missing CRLF",
+			input: "$12\r\nHello World",
+			expected: Value{
+				typ:   BulkString,
+				Raw:   []byte("Hello World"),
+				IsNil: false,
+			},
+			size:  12,
+			isNil: false,
+		},
+		{
+			name:  "BulkString with Invalid Byte Length",
+			input: "$12\r\nHello\r\n",
+			expected: Value{
+				typ:   BulkString,
+				Raw:   []byte("Hello"),
+				IsNil: false,
+			},
+			size:  0,
+			isNil: false,
+		},
+		{
+			name:  "BulkString with Incorrect byte length",
+			input: "$5\r\nHelloExtraData\r\n",
+			expected: Value{
+				typ:   BulkString,
+				Raw:   []byte("HelloExtraData"),
+				IsNil: false,
+			},
+			size:  7, // Only the valid part is considered
+			isNil: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reader := NewReader(bytes.NewBufferString(tt.input))
+			value, _, err := reader.ReadValue()
+
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
+			if value.Type() != tt.expected.typ {
+				t.Errorf("Expected RespDataType = %v, got %v", tt.expected.typ, value.Type())
+			}
+
+			if string(value.Raw) != string(tt.expected.Raw) {
+				t.Errorf("Expected Raw = %s, got %s", tt.expected.Raw, value.Raw)
+			}
+
+			if value.IsNil != tt.isNil {
+				t.Errorf("Expected IsNil = %v, got %v", tt.isNil, value.IsNil)
+			}
+
+			if tt.size != tt.size {
+				t.Errorf("Expected size = %d, got %d", tt.size, tt.size)
+			}
+		})
+	}
+}
+
+func TestReader_ReadBulkStringValueInvalid(t *testing.T) {
+	test := struct {
+		name     string
+		input    string
+		size     int
+		expected Value
+		isNil    bool
+	}{
+		name:     "Invalid string format",
+		input:    "$ABC\\r\\nHello\\r\\n",
+		expected: nullValue,
+		size:     0,
+	}
+
+	t.Run(test.name, func(t *testing.T) {
+		reader := NewReader(bytes.NewBufferString(test.input))
+		value, _, err := reader.ReadValue()
+
+		if value.Type() != Null {
+			t.Errorf("Expected RespDataType = %v, got %v", Null, value.Type())
+		}
+
+		expectedError := errors.New("invalid bulk string")
+
+		if err.Error() != expectedError.Error() {
+			t.Errorf("Expected error = %v, got %v", expectedError, err)
+		}
+	})
+}
+
+func TestReader_ReadArrayValue(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		size     int
+		expected Value
+		isNil    bool
+	}{
+		{
+			name:  "Array",
+			input: "*3\r\n$12\r\nHello World\r\n:12345\r\n$-1\r\n",
+			expected: Value{
+				typ: Array,
+				Values: []Value{
+					{
+						typ:   BulkString,
+						Raw:   []byte("Hello World"),
+						IsNil: false,
+					},
+					{
+						typ: Integer,
+						Raw: []byte("12345"),
+					},
+					{
+						typ:   Null,
+						IsNil: true,
+					},
+				},
+			},
+		},
+		{
+			name:  "Array Sample",
+			input: "*2\r\n$4\r\nECHO\r\n$3\r\nhey\r\n",
+			expected: Value{
+				typ: Array,
+				Values: []Value{
+					BulkStringValue("ECHO"),
+					BulkStringValue("hey"),
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reader := NewReader(bytes.NewBufferString(tt.input))
+			value, _, err := reader.ReadValue()
+
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
+			if value.Type() != Array {
+				t.Errorf("Expected RespDataType = %v, got %v", Array, value.Type())
+			}
+
+			if value.IsNil != tt.isNil {
+				t.Errorf("Expected IsNil = %v, got %v", tt.isNil, value.IsNil)
+			}
+
+			for i, v := range value.Values {
+				assert.Equal(t, tt.expected.Values[i].Type(), v.Type(), "Expected RespDataType = %v, got %v", tt.expected.Values[i].Type(), v.Type())
+				assert.Equal(t, string(tt.expected.Values[i].Raw), string(v.Raw), "Expected Raw = %s, got %s", tt.expected.Values[i].Raw, v.Raw)
+			}
+		})
+	}
+}
+
+func TestReader_ReadBooleanValue(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected Value
+		output   bool
+	}{
+		{
+			name:  "Boolean - True",
+			input: "#t\r\n",
+			expected: Value{
+				typ: Boolean,
+				Raw: []byte("t"),
+			},
+			output: true,
+		},
+		{
+			name:  "Boolean - False",
+			input: "#f\r\n",
+			expected: Value{
+				typ: Boolean,
+				Raw: []byte("f"),
+			},
+			output: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reader := NewReader(bytes.NewBufferString(tt.input))
+			value, _, _ := reader.ReadValue()
+
+			if value.Type() != tt.expected.typ {
+				t.Errorf("Expected RespDataType = %v, got %v", tt.expected.typ, value.Type())
+			}
+
+			b, _ := value.AsBool()
+
+			if b != tt.output {
+				t.Errorf("Expect boolean value to be = %v, got %v", tt.output, b)
+			}
+		})
+	}
+}

@@ -7,9 +7,6 @@ This project leverages **Go's networking** and **concurrency features** to suppo
     - `SET` - Store a key-value pair in memory.
     - `GET` - Retrieve the value for a given key.
 
-- **Concurrency**: Handles multiple client connections.
-- **Simple Design**: Lightweight and ideal for learning purposes.
-
 ## Prerequisites
 - Go **v1.23** or higher.
 - Redis CLI or any Redis client for testing.

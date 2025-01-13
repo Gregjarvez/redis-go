@@ -45,10 +45,11 @@ func StringValue(s string) Value {
 	}
 }
 
-func BulkStringValue(s string) Value {
+func BulkStringValue(s string, isNil ...bool) Value {
 	return Value{
-		typ: BulkString,
-		Raw: []byte(s),
+		typ:   BulkString,
+		Raw:   []byte(s),
+		IsNil: len(isNil) > 0 && isNil[0],
 	}
 }
 
@@ -138,7 +139,7 @@ func (v *Value) Marshal() ([]byte, error) {
 		return format(Null, nil), nil
 	case BulkString:
 		if v.IsNil {
-			return format(BulkString, []byte("-1")), nil
+			return []byte("$-1\r\n"), nil
 		}
 		return format(BulkString, []byte(fmt.Sprintf("%d\r\n%s", len(v.Raw), v.Raw))), nil
 	case Array:

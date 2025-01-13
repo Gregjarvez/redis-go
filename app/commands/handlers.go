@@ -55,7 +55,7 @@ func getHandler(c Command, s store.DataStore) (resp.Value, error) {
 	record := s.Read(key)
 
 	if record == nil {
-		return resp.BulkStringValue("-1"), nil
+		return resp.BulkStringValue("", true), nil
 	}
 
 	return resp.BulkStringValue(record.String()), nil

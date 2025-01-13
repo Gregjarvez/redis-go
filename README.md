@@ -21,7 +21,7 @@ This project leverages **Go's networking** and **concurrency features** to suppo
 ```
 1. Navigate to the project directory:
 ``` bash
-   cd redis-go
+   cd redis-gp
 ```
 1. Build the project:
 ``` bash
@@ -34,7 +34,7 @@ This project leverages **Go's networking** and **concurrency features** to suppo
 ```
 1. Connect to the server using the Redis CLI:
 ``` bash
-   redis-cli -h <host> -p <port>
+   redis-cli
 ```
 ## Testing Commands
 - **PING**:

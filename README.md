@@ -1,33 +1,59 @@
-[![progress-banner](https://backend.codecrafters.io/progress/redis/9f4eef51-c1b5-4e4b-9d83-9f47c4c4476f)](https://app.codecrafters.io/users/codecrafters-bot?r=2qF)
+# Redis Go
+A simple Redis server implementation in Go, built as part of a learning exercise or for lightweight, custom Redis-like use cases.
+This project leverages **Go's networking** and **concurrency features** to support basic Redis commands, aiming to provide a functional yet minimal Redis-like server.
+## Features
+- **Basic Commands**
+    - `PING` - Test connectivity with the server.
+    - `SET` - Store a key-value pair in memory.
+    - `GET` - Retrieve the value for a given key.
 
-This is a starting point for Go solutions to the
-["Build Your Own Redis" Challenge](https://codecrafters.io/challenges/redis).
+- **Concurrency**: Handles multiple client connections.
+- **Simple Design**: Lightweight and ideal for learning purposes.
 
-In this challenge, you'll build a toy Redis clone that's capable of handling
-basic commands like `PING`, `SET` and `GET`. Along the way we'll learn about
-event loops, the Redis protocol and more.
+## Prerequisites
+- Go **v1.23** or higher.
+- Redis CLI or any Redis client for testing.
 
-**Note**: If you're viewing this repo on GitHub, head over to
-[codecrafters.io](https://codecrafters.io) to try the challenge.
-
-# Passing the first stage
-
-The entry point for your Redis implementation is in `app/server.go`. Study and
-uncomment the relevant code, and push your changes to pass the first stage:
-
-```sh
-git commit -am "pass 1st stage" # any msg
-git push origin master
+## Installation
+1. Clone the repository:
+``` bash
+   git clone <repository-url>
 ```
-
-That's all!
-
-# Stage 2 & beyond
-
-Note: This section is for stages 2 and beyond.
-
-1. Ensure you have `go (1.19)` installed locally
-1. Run `./your_program.sh` to run your Redis server, which is implemented in
-   `app/server.go`.
-1. Commit your changes and run `git push origin master` to submit your solution
-   to CodeCrafters. Test output will be streamed to your terminal.
+1. Navigate to the project directory:
+``` bash
+   cd redis-go
+```
+1. Build the project:
+``` bash
+   go build -o redis-go .
+```
+## Usage
+1. Start the server:
+``` bash
+   ./redis-go
+```
+1. Connect to the server using the Redis CLI:
+``` bash
+   redis-cli -h <host> -p <port>
+```
+## Testing Commands
+- **PING**:
+``` bash
+  > PING
+  +PONG
+```
+- **SET**:
+``` bash
+  > SET key value
+  +OK
+```
+- **GET**:
+``` bash
+  > GET key
+  "value"
+```
+## Project Goals
+This project is designed to:
+1. Explore Go's capabilities in building a custom server.
+2. Understand concurrency patterns and networking in Go.
+3. Serve as a practical example for custom lightweight Redis-like use cases.

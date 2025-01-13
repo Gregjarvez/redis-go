@@ -2,6 +2,7 @@ package commands
 
 import (
 	"github.com/codecrafters-io/redis-starter-go/app/commands/resp"
+	"github.com/codecrafters-io/redis-starter-go/app/store"
 )
 
 type Command struct {
@@ -32,6 +33,6 @@ func NewCommand(value resp.Value) (Command, error) {
 	}, nil
 }
 
-func (c Command) Execute(handler CommandRouter) (resp.Value, error) {
-	return handler.Handle(c)
+func (c Command) Execute(handler CommandRouter, s store.DataStore) (resp.Value, error) {
+	return handler.Handle(c, s)
 }

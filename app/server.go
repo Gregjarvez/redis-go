@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/codecrafters-io/redis-starter-go/app/commands"
 	"github.com/codecrafters-io/redis-starter-go/app/commands/resp"
+	"github.com/codecrafters-io/redis-starter-go/app/store"
 	"io"
 	"log"
 	"net"
@@ -25,6 +26,7 @@ type Server struct {
 	listener   net.Listener
 	shutdown   chan struct{}
 	connection chan net.Conn
+	datastore  store.DataStore
 }
 
 func main() {
@@ -62,6 +64,9 @@ func NewTcpServer(listAddr string) (*Server, error) {
 		listener:   ln,
 		connection: make(chan net.Conn),
 		shutdown:   make(chan struct{}),
+		datastore: &store.Memory{
+			Store: make(map[string]*store.Record),
+		},
 	}, nil
 }
 
@@ -153,7 +158,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 				continue
 			}
 
-			result, execErr := com.Execute(commands.DefaultHandlers)
+			result, execErr := com.Execute(commands.DefaultHandlers, s.datastore)
 			if execErr != nil {
 				conn.Write([]byte(fmt.Sprintf("-ERR %v\r\n", execErr.Error())))
 				continue

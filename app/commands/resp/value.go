@@ -56,6 +56,13 @@ func NullValue() Value {
 	return nullValue
 }
 
+func ErrorValue(s string) Value {
+	return Value{
+		typ: SimpleError,
+		Raw: []byte(s),
+	}
+}
+
 func (t DataType) String() string {
 	switch t {
 	case SimpleString:

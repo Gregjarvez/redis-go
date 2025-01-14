@@ -12,7 +12,7 @@ This project leverages **Go's networking** and **concurrency features** to suppo
 - Redis CLI or any Redis client for testing.
 
 ## Installation
-1. Clone the repository:
+1. Clone the repository::
 ``` bash
    git clone <repository-url>
 ```

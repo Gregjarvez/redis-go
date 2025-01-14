@@ -1,6 +1,5 @@
 package main
 
-import "C"
 import (
 	"bytes"
 	"flag"
@@ -34,8 +33,10 @@ type Server struct {
 
 func main() {
 	// You can use print statements as follows for debugging, they'll be visible when running tests.
-	fmt.Println("Logs from your program will appear here!")
+	fmt.Println("Starting server...")
 	flag.Parse()
+
+	fmt.Println(os.Args)
 
 	addr := fmt.Sprintf("%s:%v", *config.Config.Host, *config.Config.Port)
 	server, err := NewTcpServer(addr)

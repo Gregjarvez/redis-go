@@ -81,7 +81,7 @@ func setHandler(c Command, s store.DataStore) (resp.Value, error) {
 	return resp.StringValue("OK"), nil
 }
 
-func configHandler(c Command, s store.DataStore) (result resp.Value, err error) {
+func configHandler(c Command, _ store.DataStore) (result resp.Value, err error) {
 	cmd := c.Args[0]
 	arg := c.Args[1]
 

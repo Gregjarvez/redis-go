@@ -52,6 +52,12 @@ func BulkStringValue(s string, isNil ...bool) Value {
 		IsNil: len(isNil) > 0 && isNil[0],
 	}
 }
+func ArrayValue(values ...Value) Value {
+	return Value{
+		typ:    Array,
+		Values: values,
+	}
+}
 
 func NullValue() Value {
 	return nullValue

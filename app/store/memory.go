@@ -1,7 +1,17 @@
 package store
 
+import "sync"
+
 type Memory struct {
+	mu    *sync.RWMutex
 	Store map[string]*Record
+}
+
+func NewMemory() *Memory {
+	return &Memory{
+		mu:    &sync.RWMutex{},
+		Store: make(map[string]*Record),
+	}
 }
 
 func (m *Memory) Read(key string) *Record {
@@ -26,6 +36,8 @@ func (m *Memory) Write(key string, value string, params ...Options) error {
 		ttl = params[0].TTL
 	}
 
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.Store[key] = NewRecord(value, ttl)
 
 	return nil

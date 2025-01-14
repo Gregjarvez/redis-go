@@ -1,10 +1,13 @@
 package main
 
+import "C"
 import (
 	"bytes"
+	"flag"
 	"fmt"
 	"github.com/codecrafters-io/redis-starter-go/app/commands"
 	"github.com/codecrafters-io/redis-starter-go/app/commands/resp"
+	"github.com/codecrafters-io/redis-starter-go/app/config"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
 	"io"
 	"log"
@@ -32,8 +35,10 @@ type Server struct {
 func main() {
 	// You can use print statements as follows for debugging, they'll be visible when running tests.
 	fmt.Println("Logs from your program will appear here!")
+	flag.Parse()
 
-	server, err := NewTcpServer("0.0.0.0:6379")
+	addr := fmt.Sprintf("%s:%v", *config.Config.Host, *config.Config.Port)
+	server, err := NewTcpServer(addr)
 
 	if err != nil {
 		log.Fatal(err)
@@ -64,9 +69,7 @@ func NewTcpServer(listAddr string) (*Server, error) {
 		listener:   ln,
 		connection: make(chan net.Conn),
 		shutdown:   make(chan struct{}),
-		datastore: &store.Memory{
-			Store: make(map[string]*store.Record),
-		},
+		datastore:  store.NewMemory(),
 	}, nil
 }
 

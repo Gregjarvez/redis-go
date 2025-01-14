@@ -33,6 +33,6 @@ func NewCommand(value resp.Value) (Command, error) {
 	}, nil
 }
 
-func (c Command) Execute(handler CommandRouter, s store.DataStore) (resp.Value, error) {
+func (c Command) Execute(handler commandRouter, s store.DataStore) (resp.Value, error) {
 	return handler.Handle(c, s)
 }

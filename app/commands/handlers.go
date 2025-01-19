@@ -2,7 +2,6 @@ package commands
 
 import (
 	"errors"
-	"fmt"
 	"github.com/codecrafters-io/redis-starter-go/app/commands/resp"
 	"github.com/codecrafters-io/redis-starter-go/app/config"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
@@ -10,7 +9,7 @@ import (
 	"time"
 )
 
-type commandHandler func(c Command, s store.DataStore) (result resp.Value, err error)
+type commandHandler func(c Command, s ServerContext) (result resp.Value, err error)
 
 type commandRouter struct {
 	handlers map[string]commandHandler
@@ -21,7 +20,7 @@ func (c *commandRouter) canHandle(cmd string) bool {
 	return ok
 }
 
-func (c *commandRouter) Handle(cmd Command, s store.DataStore) (result resp.Value, err error) {
+func (c *commandRouter) Handle(cmd Command, s ServerContext) (result resp.Value, err error) {
 	typ := strings.ToUpper(cmd.Type)
 
 	if !c.canHandle(typ) {
@@ -43,22 +42,22 @@ var DefaultHandlers = commandRouter{
 	},
 }
 
-func pingHandler(_ Command, _ store.DataStore) (resp.Value, error) {
+func pingHandler(_ Command, _ ServerContext) (resp.Value, error) {
 	return resp.StringValue("PONG"), nil
 }
 
-func echoHandler(c Command, _ store.DataStore) (resp.Value, error) {
+func echoHandler(c Command, _ ServerContext) (resp.Value, error) {
 	return resp.BulkStringValue(c.Args[0]), nil
 }
 
-func getHandler(c Command, s store.DataStore) (resp.Value, error) {
+func getHandler(c Command, context ServerContext) (resp.Value, error) {
 	if len(c.Args) == 0 {
 		err := errors.New("no key provided")
 		return resp.ErrorValue(err.Error()), err
 	}
 
 	key := c.Args[0]
-	record := s.Read(key)
+	record := context.Store.Read(key)
 
 	if record == nil {
 		return resp.BulkStringValue("", true), nil
@@ -67,7 +66,7 @@ func getHandler(c Command, s store.DataStore) (resp.Value, error) {
 	return resp.BulkStringValue(record.String()), nil
 }
 
-func setHandler(c Command, s store.DataStore) (resp.Value, error) {
+func setHandler(c Command, context ServerContext) (resp.Value, error) {
 	now := time.Now()
 	args, err := parseSetCommandOptions(c.Args)
 
@@ -82,7 +81,7 @@ func setHandler(c Command, s store.DataStore) (resp.Value, error) {
 		unixTTL = now.Add(time.Duration(ttl) * time.Millisecond).UnixMilli()
 	}
 
-	err = s.Write(args.Key, args.Value, store.Options{
+	err = context.Store.Write(args.Key, args.Value, store.Options{
 		TTL: unixTTL,
 	})
 
@@ -93,7 +92,7 @@ func setHandler(c Command, s store.DataStore) (resp.Value, error) {
 	return resp.StringValue("OK"), nil
 }
 
-func configHandler(c Command, _ store.DataStore) (result resp.Value, err error) {
+func configHandler(c Command, _ ServerContext) (result resp.Value, err error) {
 	cmd := c.Args[0]
 	arg := c.Args[1]
 
@@ -111,14 +110,14 @@ func configHandler(c Command, _ store.DataStore) (result resp.Value, err error) 
 	}
 }
 
-func keysHandler(c Command, s store.DataStore) (resp.Value, error) {
+func keysHandler(c Command, context ServerContext) (resp.Value, error) {
 	if len(c.Args) == 0 {
 		err := errors.New("no pattern provided")
 		return resp.ErrorValue(err.Error()), err
 	}
 
 	pattern := c.Args[0]
-	keys := s.Keys()
+	keys := context.Store.Keys()
 
 	// support for the "*" pattern for now
 	keysToResp := make([]resp.Value, len(keys))
@@ -132,7 +131,7 @@ func keysHandler(c Command, s store.DataStore) (resp.Value, error) {
 	return resp.ArrayValue(keysToResp...), nil
 }
 
-func infoHandler(c Command, _ store.DataStore) (resp.Value, error) {
+func infoHandler(c Command, context ServerContext) (resp.Value, error) {
 	if len(c.Args) == 0 {
 		return resp.ErrorValue("ERR: no arguments provided"), nil
 	}
@@ -140,12 +139,7 @@ func infoHandler(c Command, _ store.DataStore) (resp.Value, error) {
 
 	switch arg {
 	case "replication":
-		role := "master"
-		if *config.Config.Replica {
-			role = "slave"
-		}
-
-		return resp.BulkStringValue(fmt.Sprintf("role:%s", role)), nil
+		return resp.BulkStringValue(context.Info.String()), nil
 	default:
 		return resp.BulkStringValue("ERR: unknown argument"), nil
 	}

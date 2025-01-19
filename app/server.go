@@ -18,18 +18,14 @@ import (
 	"time"
 )
 
-// Ensures gofmt doesn't remove the "net" and "os" imports in stage 1 (feel free to remove this!)
-var _ = net.Listen
-var _ = os.Exit
-
 type Server struct {
-	wg         sync.WaitGroup
 	listAddr   string
 	listener   net.Listener
 	shutdown   chan struct{}
-	connection chan net.Conn
 	datastore  store.DataStore
-	role       string
+	wg         sync.WaitGroup
+	connection chan net.Conn
+	info       config.Info
 }
 
 func main() {
@@ -66,18 +62,13 @@ func NewTcpServer(listAddr string) (*Server, error) {
 	s := store.NewMemory()
 	s.Hydrate()
 
-	role := "master"
-	if *config.Config.Replica {
-		role = "slave"
-	}
-
 	return &Server{
 		listAddr:   listAddr,
 		listener:   ln,
 		connection: make(chan net.Conn),
 		shutdown:   make(chan struct{}),
 		datastore:  s,
-		role:       role,
+		info:       config.NewInfo(config.Config),
 	}, nil
 }
 
@@ -165,19 +156,26 @@ func (s *Server) handleConnection(conn net.Conn) {
 			// Process the command
 			com, err := commands.NewCommand(value)
 			if err != nil {
-				conn.Write([]byte(fmt.Sprintf("-ERR %v\r\n", err.Error())))
+				_, werr := conn.Write([]byte(fmt.Sprintf("-ERR %v\r\n", err.Error())))
+				fmt.Println("Error writing to connection:", werr)
 				continue
 			}
 
-			result, execErr := com.Execute(commands.DefaultHandlers, s.datastore)
+			result, execErr := com.Execute(commands.DefaultHandlers, commands.ServerContext{
+				Store: s.datastore,
+				Info:  s.info,
+			})
+
 			if execErr != nil {
-				conn.Write([]byte(fmt.Sprintf("-ERR %v\r\n", execErr.Error())))
+				_, werr := conn.Write([]byte(fmt.Sprintf("-ERR %v\r\n", execErr.Error())))
+				fmt.Println("Error writing to connection:", werr)
 				continue
 			}
 
 			rp, marshalErr := result.Marshal()
 			if marshalErr != nil {
-				conn.Write([]byte(fmt.Sprintf("-ERR %v\r\n", marshalErr.Error())))
+				_, werr := conn.Write([]byte(fmt.Sprintf("-ERR %v\r\n", marshalErr.Error())))
+				fmt.Println("Error writing to connection:", werr)
 				continue
 			}
 

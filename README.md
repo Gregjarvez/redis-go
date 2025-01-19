@@ -1,6 +1,6 @@
 # Redis Go
 A simple Redis server implementation in Go, built as part of a learning exercise or for lightweight, custom Redis-like use cases.
-This project leverages **Go's networking** and **concurrency features** to support basic Redis commands, aiming to provide a functional yet minimal Redis-like server.
+This project leverages **Go'store networking** and **concurrency features** to support basic Redis commands, aiming to provide a functional yet minimal Redis-like server.
 ## Features
 - **Basic Commands**
     - `PING` - Test connectivity with the server.
@@ -51,6 +51,6 @@ This project leverages **Go's networking** and **concurrency features** to suppo
 ```
 ## Project Goals
 This project is designed to:
-1. Explore Go's capabilities in building a custom server.
+1. Explore Go'store capabilities in building a custom server.
 2. Understand concurrency patterns and networking in Go.
 3. Serve as a practical example for custom lightweight Redis-like use cases.

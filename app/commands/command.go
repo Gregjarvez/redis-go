@@ -3,12 +3,18 @@ package commands
 import (
 	"errors"
 	"github.com/codecrafters-io/redis-starter-go/app/commands/resp"
+	"github.com/codecrafters-io/redis-starter-go/app/config"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
 )
 
 type Command struct {
 	Type string
 	Args []string
+}
+
+type ServerContext struct {
+	Store store.DataStore
+	Info  config.Info
 }
 
 func NewCommand(value resp.Value) (Command, error) {
@@ -37,6 +43,6 @@ func NewCommand(value resp.Value) (Command, error) {
 	}, nil
 }
 
-func (c Command) Execute(handler commandRouter, s store.DataStore) (resp.Value, error) {
+func (c Command) Execute(handler commandRouter, s ServerContext) (resp.Value, error) {
 	return handler.Handle(c, s)
 }

@@ -21,5 +21,5 @@ func (r *Record) String() string {
 }
 
 func (r *Record) IsExpired() bool {
-	return r.TTL != 0 && time.Now().Unix() >= r.TTL
+	return r.TTL != 0 && time.Now().UnixMilli() > r.TTL
 }

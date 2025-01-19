@@ -66,6 +66,7 @@ func getHandler(c Command, s store.DataStore) (resp.Value, error) {
 }
 
 func setHandler(c Command, s store.DataStore) (resp.Value, error) {
+	now := time.Now()
 	args, err := parseSetCommandOptions(c.Args)
 
 	if err != nil {
@@ -76,7 +77,7 @@ func setHandler(c Command, s store.DataStore) (resp.Value, error) {
 	var unixTTL int64
 
 	if ttl != 0 {
-		unixTTL = time.Now().Add(time.Duration(ttl) * time.Millisecond).Unix()
+		unixTTL = now.Add(time.Duration(ttl) * time.Millisecond).UnixMilli()
 	}
 
 	err = s.Write(args.Key, args.Value, store.Options{

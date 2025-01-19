@@ -15,9 +15,9 @@ const (
 )
 
 type Info struct {
-	role             Role
-	masterReplid     string
-	masterReplOffset int64
+	Role             Role
+	MasterReplid     string
+	MasterReplOffset int64
 }
 
 func NewInfo(config Configuration) Info {
@@ -27,15 +27,15 @@ func NewInfo(config Configuration) Info {
 		masterReplicaOffset = int64(0)
 	)
 
-	if !*config.Replica {
+	if *config.ReplicaOf == "" {
 		role = Master
 		masterReplicaId, _ = generateReplicationId()
 	}
 
 	return Info{
-		role:             role,
-		masterReplid:     masterReplicaId,
-		masterReplOffset: masterReplicaOffset,
+		Role:             role,
+		MasterReplid:     masterReplicaId,
+		MasterReplOffset: masterReplicaOffset,
 	}
 }
 
@@ -52,9 +52,9 @@ func generateReplicationId() (string, error) {
 
 func (i Info) String() string {
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("role:%s\r\n", i.role))
-	sb.WriteString(fmt.Sprintf("master_replid:%s\r\n", i.masterReplid))
-	sb.WriteString(fmt.Sprintf("master_repl_offset:%d\r\n", i.masterReplOffset))
+	sb.WriteString(fmt.Sprintf("role:%s\r\n", i.Role))
+	sb.WriteString(fmt.Sprintf("master_replid:%s\r\n", i.MasterReplid))
+	sb.WriteString(fmt.Sprintf("master_repl_offset:%d\r\n", i.MasterReplOffset))
 
 	return sb.String()
 }

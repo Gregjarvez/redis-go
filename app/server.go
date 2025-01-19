@@ -36,8 +36,6 @@ func main() {
 	fmt.Println("Starting server...")
 	flag.Parse()
 
-	fmt.Println(os.Args)
-
 	addr := fmt.Sprintf("%s:%v", *config.Config.Host, *config.Config.Port)
 	server, err := NewTcpServer(addr)
 
@@ -64,13 +62,15 @@ func NewTcpServer(listAddr string) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+	s := store.NewMemory()
+	s.Hydrate()
 
 	return &Server{
 		listAddr:   listAddr,
 		listener:   ln,
 		connection: make(chan net.Conn),
 		shutdown:   make(chan struct{}),
-		datastore:  store.NewMemory(),
+		datastore:  s,
 	}, nil
 }
 

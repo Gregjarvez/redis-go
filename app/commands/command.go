@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"errors"
 	"github.com/codecrafters-io/redis-starter-go/app/commands/resp"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
 )
@@ -11,6 +12,9 @@ type Command struct {
 }
 
 func NewCommand(value resp.Value) (Command, error) {
+	if value.Type() == resp.Null {
+		return Command{}, errors.New("invalid command")
+	}
 	if value.Type() == resp.Array {
 		var arr []string
 

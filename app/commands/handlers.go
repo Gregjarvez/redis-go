@@ -6,6 +6,7 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/config"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
 	"strings"
+	"time"
 )
 
 type commandHandler func(c Command, s store.DataStore) (result resp.Value, err error)
@@ -36,6 +37,7 @@ var DefaultHandlers = commandRouter{
 		"SET":    setHandler,
 		"GET":    getHandler,
 		"CONFIG": configHandler,
+		"KEYS":   keysHandler,
 	},
 }
 
@@ -70,8 +72,15 @@ func setHandler(c Command, s store.DataStore) (resp.Value, error) {
 		return resp.ErrorValue(err.Error()), err
 	}
 
+	ttl := args.ExpireMillis
+	var unixTTL int64
+
+	if ttl != 0 {
+		unixTTL = time.Now().Add(time.Duration(ttl) * time.Millisecond).Unix()
+	}
+
 	err = s.Write(args.Key, args.Value, store.Options{
-		TTL: args.ExpireAtMillis,
+		TTL: unixTTL,
 	})
 
 	if err != nil {
@@ -97,4 +106,25 @@ func configHandler(c Command, _ store.DataStore) (result resp.Value, err error) 
 	default:
 		return resp.ErrorValue("unknown argument"), nil
 	}
+}
+
+func keysHandler(c Command, s store.DataStore) (resp.Value, error) {
+	if len(c.Args) == 0 {
+		err := errors.New("no pattern provided")
+		return resp.ErrorValue(err.Error()), err
+	}
+
+	pattern := c.Args[0]
+	keys := s.Keys()
+
+	// support for the "*" pattern for now
+	keysToResp := make([]resp.Value, len(keys))
+
+	if pattern == "*" {
+		for i, k := range keys {
+			keysToResp[i] = resp.BulkStringValue(k)
+		}
+	}
+
+	return resp.ArrayValue(keysToResp...), nil
 }

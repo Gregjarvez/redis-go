@@ -2,6 +2,7 @@ package commands
 
 import (
 	"errors"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -17,19 +18,6 @@ type SetCommandOptions struct {
 	ExpireAtSec    int64  // Use EXAT (expiration in absolute seconds)
 	ExpireAtMillis int64  // Use PXAT (expiration in absolute milliseconds)
 	KeepTTL        bool   // Set if KEEPTTL is provided
-}
-
-func IndexFunc[S ~[]E, E any](s S, f func(E) bool) int {
-	for i := range s {
-		if f(s[i]) {
-			return i
-		}
-	}
-	return -1
-}
-
-func ContainsFunc[S ~[]E, E any](s S, f func(E) bool) bool {
-	return IndexFunc(s, f) >= 0
 }
 
 func uppercasedCompare(a string) func(string) bool {
@@ -49,10 +37,10 @@ func parseSetCommandOptions(args []string) (SetCommandOptions, error) {
 
 	var px int64
 
-	fn := uppercasedCompare("PX")
+	pxExpiry := uppercasedCompare("px")
 
-	if ContainsFunc(args, fn) {
-		idx := IndexFunc(args, fn)
+	if slices.ContainsFunc(args, pxExpiry) {
+		idx := slices.IndexFunc(args, pxExpiry)
 		if idx > -1 {
 			c, err := strconv.Atoi(args[idx+1])
 
@@ -65,15 +53,13 @@ func parseSetCommandOptions(args []string) (SetCommandOptions, error) {
 	}
 
 	return SetCommandOptions{
-		Key:            args[0],
-		Value:          args[1],
-		NX:             false, // Not implemented yet
-		XX:             false,
-		GET:            false,
-		KeepTTL:        false,
-		ExpireSeconds:  0,
-		ExpireMillis:   0,
-		ExpireAtSec:    0,
-		ExpireAtMillis: px,
+		Key:           args[0],
+		Value:         args[1],
+		NX:            false, // Not implemented yet
+		XX:            false,
+		GET:           false,
+		KeepTTL:       false,
+		ExpireSeconds: 0,
+		ExpireMillis:  px,
 	}, nil
 }

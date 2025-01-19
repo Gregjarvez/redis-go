@@ -2,6 +2,7 @@ package tcp
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"github.com/codecrafters-io/redis-starter-go/app/commands/resp"
 	"github.com/codecrafters-io/redis-starter-go/app/config"
@@ -24,15 +25,14 @@ func (m *SlaveServer) Stop() {
 	m.StopListener()
 }
 
+var connectionError = errors.New("error connecting to master")
+
 func (m *SlaveServer) connnectToMaster() {
 	s := strings.Split(*config.Config.ReplicaOf, " ")
-	mastrAddr := fmt.Sprintf("%s:%s", s[0], s[1])
-
-	conn, err := net.DialTimeout("tcp", mastrAddr, 5*time.Second)
+	conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%s", s[0], s[1]), 5*time.Second)
 
 	if err != nil {
-		fmt.Println("Error connecting to master")
-		return
+		panic(connectionError)
 	}
 	defer conn.Close()
 
@@ -47,33 +47,58 @@ func (m *SlaveServer) connnectToMaster() {
 
 	response = readResponse(conn)
 
-	println(response)
 	if response != "+PONG" {
-		panic("Error connecting to master")
+		panic(connectionError)
 	}
 
-	sendREPLCONF(writer, "listening-port", strconv.Itoa(*config.Config.Port))
-	response = readResponse(conn)
-	if response != "+OK" {
-		panic("Error connecting to master")
+	sendREPLCONF(conn, "listening-port", strconv.Itoa(*config.Config.Port))
+	sendREPLCONF(conn, "capa", "eof", "capa", "psync2")
+	sendPSYNC(conn, "?", "-1")
+}
+
+func sendREPLCONF(conn net.Conn, params ...string) {
+	args := make([]resp.Value, 0, len(params)+1)
+	args = append(args, resp.BulkStringValue("REPLCONF"))
+
+	for _, p := range params {
+		args = append(args, resp.BulkStringValue(p))
 	}
 
-	sendREPLCONF(writer, "capa", "psync2")
-	response = readResponse(conn)
-	if response != "+OK" {
-		panic("Error connecting to master")
+	writer := bufio.NewWriter(conn)
+	repleConf := resp.ArrayValue(
+		args...,
+	)
+
+	response, _ := repleConf.Marshal()
+	_, err := writer.Write(response)
+
+	if err != nil {
+		return
+	}
+
+	err = writer.Flush()
+	if err != nil {
+		return
+	}
+
+	r := readResponse(conn)
+	if r != "+OK" {
+		panic(connectionError)
 	}
 }
 
-func sendREPLCONF(conn *bufio.Writer, key, value string) {
-	repleConf := resp.ArrayValue(
-		resp.BulkStringValue("REPLCONF"),
-		resp.BulkStringValue(key),
-		resp.BulkStringValue(value),
+func sendPSYNC(conn net.Conn, replid, offset string) {
+	writer := bufio.NewWriter(conn)
+	psync := resp.ArrayValue(
+		resp.BulkStringValue("PSYNC"),
+		resp.BulkStringValue(replid),
+		resp.BulkStringValue(offset),
 	)
-	response, _ := repleConf.Marshal()
-	conn.Write(response)
-	conn.Flush()
+	response, _ := psync.Marshal()
+	writer.Write(response)
+	writer.Flush()
+
+	_ = readResponse(conn)
 }
 
 func readResponse(conn net.Conn) string {

@@ -29,6 +29,7 @@ type Server struct {
 	shutdown   chan struct{}
 	connection chan net.Conn
 	datastore  store.DataStore
+	role       string
 }
 
 func main() {
@@ -65,12 +66,18 @@ func NewTcpServer(listAddr string) (*Server, error) {
 	s := store.NewMemory()
 	s.Hydrate()
 
+	role := "master"
+	if *config.Config.Replica {
+		role = "slave"
+	}
+
 	return &Server{
 		listAddr:   listAddr,
 		listener:   ln,
 		connection: make(chan net.Conn),
 		shutdown:   make(chan struct{}),
 		datastore:  s,
+		role:       role,
 	}, nil
 }
 

@@ -2,6 +2,7 @@ package commands
 
 import (
 	"errors"
+	"fmt"
 	"github.com/codecrafters-io/redis-starter-go/app/commands/resp"
 	"github.com/codecrafters-io/redis-starter-go/app/config"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
@@ -38,6 +39,7 @@ var DefaultHandlers = commandRouter{
 		"GET":    getHandler,
 		"CONFIG": configHandler,
 		"KEYS":   keysHandler,
+		"INFO":   infoHandler,
 	},
 }
 
@@ -128,4 +130,23 @@ func keysHandler(c Command, s store.DataStore) (resp.Value, error) {
 	}
 
 	return resp.ArrayValue(keysToResp...), nil
+}
+
+func infoHandler(c Command, _ store.DataStore) (resp.Value, error) {
+	if len(c.Args) == 0 {
+		return resp.ErrorValue("ERR: no arguments provided"), nil
+	}
+	arg := strings.ToLower(c.Args[0])
+
+	switch arg {
+	case "replication":
+		role := "master"
+		if *config.Config.Replica {
+			role = "slave"
+		}
+
+		return resp.BulkStringValue(fmt.Sprintf("role:%s", role)), nil
+	default:
+		return resp.BulkStringValue("ERR: unknown argument"), nil
+	}
 }

@@ -6,6 +6,7 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/rdb"
 	"os"
 	"sync"
+	"time"
 )
 
 type Memory struct {
@@ -97,8 +98,8 @@ func (m *Memory) Hydrate() {
 	for _, record := range parser.Context.Databases[0].Entries {
 		ttl := record.Expiry.Value
 
-		if record.Expiry.Type != rdb.EXPIRETIME_SECONDS {
-			ttl = record.Expiry.Value * 1000
+		if record.Expiry.Type == rdb.EXPIRETIME_SECONDS {
+			ttl = time.Unix(record.Expiry.Value, 0).UnixMilli()
 		}
 
 		m.Store[record.Key] = &Record{

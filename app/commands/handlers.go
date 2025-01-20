@@ -2,6 +2,7 @@ package commands
 
 import (
 	"errors"
+	"fmt"
 	"github.com/codecrafters-io/redis-starter-go/app/commands/resp"
 	"github.com/codecrafters-io/redis-starter-go/app/config"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
@@ -40,6 +41,7 @@ var DefaultHandlers = commandRouter{
 		"KEYS":     keysHandler,
 		"INFO":     infoHandler,
 		"REPLCONF": replConfigHandler,
+		"PSYNC":    pSyncHandler,
 	},
 }
 
@@ -148,4 +150,14 @@ func infoHandler(c Command, context ServerContext) (resp.Value, error) {
 
 func replConfigHandler(c Command, _ ServerContext) (resp.Value, error) {
 	return resp.BulkStringValue("OK"), nil
+}
+
+func pSyncHandler(_ Command, s ServerContext) (resp.Value, error) {
+	return resp.BulkStringValue(
+		fmt.Sprintf(
+			"FULLRESYNC %s %v",
+			s.Info.MasterReplid,
+			s.Info.MasterReplOffset,
+		),
+	), nil
 }

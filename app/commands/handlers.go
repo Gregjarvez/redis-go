@@ -32,13 +32,14 @@ func (c *commandRouter) Handle(cmd Command, s ServerContext) (result resp.Value,
 
 var DefaultHandlers = commandRouter{
 	handlers: map[string]commandHandler{
-		"PING":   pingHandler,
-		"ECHO":   echoHandler,
-		"SET":    setHandler,
-		"GET":    getHandler,
-		"CONFIG": configHandler,
-		"KEYS":   keysHandler,
-		"INFO":   infoHandler,
+		"PING":     pingHandler,
+		"ECHO":     echoHandler,
+		"SET":      setHandler,
+		"GET":      getHandler,
+		"CONFIG":   configHandler,
+		"KEYS":     keysHandler,
+		"INFO":     infoHandler,
+		"REPLCONF": replConfigHandler,
 	},
 }
 
@@ -143,4 +144,8 @@ func infoHandler(c Command, context ServerContext) (resp.Value, error) {
 	default:
 		return resp.BulkStringValue("ERR: unknown argument"), nil
 	}
+}
+
+func replConfigHandler(c Command, _ ServerContext) (resp.Value, error) {
+	return resp.BulkStringValue("OK"), nil
 }

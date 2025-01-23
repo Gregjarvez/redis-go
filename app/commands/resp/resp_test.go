@@ -20,8 +20,8 @@ func TestRespReader_ReadSimpleValue(t *testing.T) {
 			name:  "SimpleString",
 			input: "+OK\r\n",
 			expected: Value{
-				typ: SimpleString,
-				Raw: []byte("OK"),
+				Type: SimpleString,
+				Raw:  []byte("OK"),
 			},
 			size:  5,
 			isNil: false,
@@ -30,8 +30,8 @@ func TestRespReader_ReadSimpleValue(t *testing.T) {
 			name:  "Error",
 			input: "-This is an error\r\n",
 			expected: Value{
-				typ: SimpleError,
-				Raw: []byte("This is an error"),
+				Type: SimpleError,
+				Raw:  []byte("This is an error"),
 			},
 			size:  19,
 			isNil: false,
@@ -40,7 +40,7 @@ func TestRespReader_ReadSimpleValue(t *testing.T) {
 			name:  "Null",
 			input: "_\r\n",
 			expected: Value{
-				typ:   Null,
+				Type:  Null,
 				IsNil: true,
 			},
 			size:  0,
@@ -66,8 +66,8 @@ func TestRespReader_ReadSimpleValue(t *testing.T) {
 			}
 
 			// Check the type
-			if value.Type() != tt.expected.typ {
-				t.Errorf("Expected RespDataType = %v, got %v", tt.expected.typ, value.Type())
+			if value.Type != tt.expected.Type {
+				t.Errorf("Expected RespDataType = %v, got %v", tt.expected.Type, value.Type)
 			}
 
 			// Check the raw value
@@ -94,8 +94,8 @@ func TestReader_ReadIntegerValue(t *testing.T) {
 			name:  "Integer",
 			input: ":12345\r\n",
 			expected: Value{
-				typ: Integer,
-				Raw: []byte("12345"),
+				Type: Integer,
+				Raw:  []byte("12345"),
 			},
 			size:  8,
 			isNil: false,
@@ -104,8 +104,8 @@ func TestReader_ReadIntegerValue(t *testing.T) {
 			name:  "Negative Integer",
 			input: ":-12345\r\n",
 			expected: Value{
-				typ: Integer,
-				Raw: []byte("-12345"),
+				Type: Integer,
+				Raw:  []byte("-12345"),
 			},
 			size:  9,
 			isNil: false,
@@ -121,8 +121,8 @@ func TestReader_ReadIntegerValue(t *testing.T) {
 				t.Fatalf("Unexpected error: %v", err)
 			}
 
-			if value.Type() != tt.expected.typ {
-				t.Errorf("Expected RespDataType = %v, got %v", tt.expected.typ, value.Type())
+			if value.Type != tt.expected.Type {
+				t.Errorf("Expected RespDataType = %v, got %v", tt.expected.Type, value.Type)
 			}
 
 			if string(value.Raw) != string(tt.expected.Raw) {
@@ -144,7 +144,7 @@ func TestReader_ReadBulkStringValue(t *testing.T) {
 			name:  "BulkString",
 			input: "$12\r\nHello World\r\n",
 			expected: Value{
-				typ:   BulkString,
+				Type:  BulkString,
 				Raw:   []byte("Hello World"),
 				IsNil: false,
 			},
@@ -155,7 +155,7 @@ func TestReader_ReadBulkStringValue(t *testing.T) {
 			name:  "Empty BulkString",
 			input: "$0\r\n\r\n",
 			expected: Value{
-				typ:   Null,
+				Type:  Null,
 				Raw:   []byte(""),
 				IsNil: true,
 			},
@@ -166,7 +166,7 @@ func TestReader_ReadBulkStringValue(t *testing.T) {
 			name:  "BulkString with Missing CRLF",
 			input: "$12\r\nHello World",
 			expected: Value{
-				typ:   BulkString,
+				Type:  BulkString,
 				Raw:   []byte("Hello World"),
 				IsNil: false,
 			},
@@ -177,7 +177,7 @@ func TestReader_ReadBulkStringValue(t *testing.T) {
 			name:  "BulkString with Invalid Byte Length",
 			input: "$12\r\nHello\r\n",
 			expected: Value{
-				typ:   BulkString,
+				Type:  BulkString,
 				Raw:   []byte("Hello"),
 				IsNil: false,
 			},
@@ -188,7 +188,7 @@ func TestReader_ReadBulkStringValue(t *testing.T) {
 			name:  "BulkString with Incorrect byte length",
 			input: "$5\r\nHelloExtraData\r\n",
 			expected: Value{
-				typ:   BulkString,
+				Type:  BulkString,
 				Raw:   []byte("HelloExtraData"),
 				IsNil: false,
 			},
@@ -206,8 +206,8 @@ func TestReader_ReadBulkStringValue(t *testing.T) {
 				t.Fatalf("Unexpected error: %v", err)
 			}
 
-			if value.Type() != tt.expected.typ {
-				t.Errorf("Expected RespDataType = %v, got %v", tt.expected.typ, value.Type())
+			if value.Type != tt.expected.Type {
+				t.Errorf("Expected RespDataType = %v, got %v", tt.expected.Type, value.Type)
 			}
 
 			if string(value.Raw) != string(tt.expected.Raw) {
@@ -243,8 +243,8 @@ func TestReader_ReadBulkStringValueInvalid(t *testing.T) {
 		reader := NewReader(bytes.NewBufferString(test.input))
 		value, _, err := reader.ReadValue()
 
-		if value.Type() != Null {
-			t.Errorf("Expected RespDataType = %v, got %v", Null, value.Type())
+		if value.Type != Null {
+			t.Errorf("Expected RespDataType = %v, got %v", Null, value.Type)
 		}
 
 		expectedError := errors.New("invalid bulk string")
@@ -267,19 +267,19 @@ func TestReader_ReadArrayValue(t *testing.T) {
 			name:  "Array",
 			input: "*3\r\n$12\r\nHello World\r\n:12345\r\n$-1\r\n",
 			expected: Value{
-				typ: Array,
+				Type: Array,
 				Values: []Value{
 					{
-						typ:   BulkString,
+						Type:  BulkString,
 						Raw:   []byte("Hello World"),
 						IsNil: false,
 					},
 					{
-						typ: Integer,
-						Raw: []byte("12345"),
+						Type: Integer,
+						Raw:  []byte("12345"),
 					},
 					{
-						typ:   Null,
+						Type:  Null,
 						IsNil: true,
 					},
 				},
@@ -289,10 +289,22 @@ func TestReader_ReadArrayValue(t *testing.T) {
 			name:  "Array Sample",
 			input: "*2\r\n$4\r\nECHO\r\n$3\r\nhey\r\n",
 			expected: Value{
-				typ: Array,
+				Type: Array,
 				Values: []Value{
 					BulkStringValue("ECHO"),
 					BulkStringValue("hey"),
+				},
+			},
+		},
+		{
+			name:  "Valid Array",
+			input: "*3\r\n$5\r\nPSYNC\r\n$1\r\n?\r\n$2\r\n-1\r\n",
+			expected: Value{
+				Type: Array,
+				Values: []Value{
+					BulkStringValue("PSYNC"),
+					BulkStringValue("?"),
+					BulkStringValue("-1"),
 				},
 			},
 		},
@@ -307,8 +319,8 @@ func TestReader_ReadArrayValue(t *testing.T) {
 				t.Fatalf("Unexpected error: %v", err)
 			}
 
-			if value.Type() != Array {
-				t.Errorf("Expected RespDataType = %v, got %v", Array, value.Type())
+			if value.Type != Array {
+				t.Errorf("Expected RespDataType = %v, got %v", Array, value.Type)
 			}
 
 			if value.IsNil != tt.isNil {
@@ -316,7 +328,7 @@ func TestReader_ReadArrayValue(t *testing.T) {
 			}
 
 			for i, v := range value.Values {
-				assert.Equal(t, tt.expected.Values[i].Type(), v.Type(), "Expected RespDataType = %v, got %v", tt.expected.Values[i].Type(), v.Type())
+				assert.Equal(t, tt.expected.Values[i].Type, v.Type, "Expected RespDataType = %v, got %v", tt.expected.Values[i].Type, v.Type)
 				assert.Equal(t, string(tt.expected.Values[i].Raw), string(v.Raw), "Expected Raw = %s, got %s", tt.expected.Values[i].Raw, v.Raw)
 			}
 		})
@@ -334,8 +346,8 @@ func TestReader_ReadBooleanValue(t *testing.T) {
 			name:  "Boolean - True",
 			input: "#t\r\n",
 			expected: Value{
-				typ: Boolean,
-				Raw: []byte("t"),
+				Type: Boolean,
+				Raw:  []byte("t"),
 			},
 			output: true,
 		},
@@ -343,8 +355,8 @@ func TestReader_ReadBooleanValue(t *testing.T) {
 			name:  "Boolean - False",
 			input: "#f\r\n",
 			expected: Value{
-				typ: Boolean,
-				Raw: []byte("f"),
+				Type: Boolean,
+				Raw:  []byte("f"),
 			},
 			output: false,
 		},
@@ -355,8 +367,8 @@ func TestReader_ReadBooleanValue(t *testing.T) {
 			reader := NewReader(bytes.NewBufferString(tt.input))
 			value, _, _ := reader.ReadValue()
 
-			if value.Type() != tt.expected.typ {
-				t.Errorf("Expected RespDataType = %v, got %v", tt.expected.typ, value.Type())
+			if value.Type != tt.expected.Type {
+				t.Errorf("Expected RespDataType = %v, got %v", tt.expected.Type, value.Type)
 			}
 
 			b, _ := value.AsBool()

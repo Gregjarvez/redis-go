@@ -1,6 +1,7 @@
 package tcp
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"github.com/codecrafters-io/redis-starter-go/app/commands"
@@ -111,32 +112,34 @@ func (s *BaseServer) handleConnection(conn net.Conn) {
 
 			// Process the command
 			com, err := commands.NewCommand(value)
+
 			if err != nil {
 				_, werr := conn.Write([]byte(fmt.Sprintf("-ERR %v\r\n", err.Error())))
 				fmt.Println("Error writing to connection:", werr)
 				continue
 			}
 
-			result, execErr := com.Execute(commands.DefaultHandlers, commands.ServerContext{
+			results, execErr := com.Execute(commands.DefaultHandlers, commands.ServerContext{
 				Store: s.Datastore,
 				Info:  s.Info,
 			})
 
 			if execErr != nil {
-				_, werr := conn.Write([]byte(fmt.Sprintf("-ERR %v\r\n", execErr.Error())))
-				fmt.Println("Error writing to connection:", werr)
+				conn.Write([]byte(fmt.Sprintf("-ERR %v\r\n", execErr.Error()))) //nolint:errcheck
+				fmt.Println("Error writing to connection:", execErr)
 				continue
 			}
 
-			rp, marshalErr := result.Marshal()
-			if marshalErr != nil {
-				_, werr := conn.Write([]byte(fmt.Sprintf("-ERR %v\r\n", marshalErr.Error())))
-				fmt.Println("Error writing to connection:", werr)
+			if len(results) == 0 {
 				continue
 			}
 
-			// Send the response
-			conn.Write(rp)
+			c := bufio.NewWriter(conn)
+
+			for _, result := range results {
+				c.Write(result)
+				c.Flush()
+			}
 			content.Reset()
 		}
 	}

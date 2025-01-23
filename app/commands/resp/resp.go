@@ -59,7 +59,7 @@ func (r *Reader) readSimpleValue(typ DataType) (Value, int, error) {
 	}
 
 	return Value{
-		typ:   typ,
+		Type:  typ,
 		Raw:   line,
 		IsNil: false,
 	}, size, nil
@@ -74,8 +74,8 @@ func (r *Reader) readInteger() (Value, int, error) {
 	}
 
 	return Value{
-		typ: Integer,
-		Raw: line,
+		Type: Integer,
+		Raw:  line,
 	}, *r.size, nil
 }
 
@@ -97,7 +97,7 @@ func (r *Reader) readBulkString() (Value, int, error) {
 	}
 
 	return Value{
-		typ:   BulkString,
+		Type:  BulkString,
 		Raw:   content,
 		IsNil: len(content) == 0,
 	}, *r.size, nil
@@ -140,7 +140,7 @@ func (r *Reader) readArrayValue() (Value, int, error) {
 	}
 
 	return Value{
-		typ:    Array,
+		Type:   Array,
 		Values: values,
 	}, *r.size, nil
 }

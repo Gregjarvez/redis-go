@@ -11,10 +11,12 @@ import (
 type DataType byte
 
 type Value struct {
-	IsNil  bool     // To denote a null value
-	Raw    []byte   // Raw byte data for strings, integers, and booleans
-	typ    DataType // Type of the data (e.g., Integer, BulkString, Boolean, etc.)
-	Values []Value  // For arrays, a slice of values (allows recursive definition)
+	IsNil    bool     // To denote a null value
+	Raw      []byte   // Raw byte data for strings, integers, and booleans
+	Type     DataType // Type of the data (e.g., Integer, BulkString, Boolean, etc.)
+	Values   []Value  // For arrays, a slice of values (allows recursive definition)
+	Flatten  bool
+	BulkLike bool
 }
 
 const (
@@ -31,31 +33,36 @@ const TrueValue = "t"
 
 var nullValue = Value{
 	IsNil: true,
-	typ:   Null,
-}
-
-func (v *Value) Type() DataType {
-	return v.typ
+	Type:  Null,
 }
 
 func StringValue(s string) Value {
 	return Value{
-		typ: SimpleString,
-		Raw: []byte(s),
+		Type: SimpleString,
+		Raw:  []byte(s),
 	}
 }
 
 func BulkStringValue(s string, isNil ...bool) Value {
 	return Value{
-		typ:   BulkString,
+		Type:  BulkString,
 		Raw:   []byte(s),
 		IsNil: len(isNil) > 0 && isNil[0],
 	}
 }
+
 func ArrayValue(values ...Value) Value {
 	return Value{
-		typ:    Array,
+		Type:   Array,
 		Values: values,
+	}
+}
+
+func FlatArrayValue(values ...Value) Value {
+	return Value{
+		Type:    Array,
+		Values:  values,
+		Flatten: true,
 	}
 }
 
@@ -65,8 +72,8 @@ func NullValue() Value {
 
 func ErrorValue(s string) Value {
 	return Value{
-		typ: SimpleError,
-		Raw: []byte(s),
+		Type: SimpleError,
+		Raw:  []byte(s),
 	}
 }
 
@@ -92,7 +99,7 @@ func (t DataType) String() string {
 }
 
 func (v *Value) String() string {
-	switch v.typ {
+	switch v.Type {
 	case SimpleString, SimpleError, Integer:
 		return string(v.Raw)
 	case Array:
@@ -103,14 +110,14 @@ func (v *Value) String() string {
 }
 
 func (v *Value) AsInt() (int, error) {
-	if v.typ != Integer || v.IsNil {
+	if v.Type != Integer || v.IsNil {
 		return 0, errors.New("value not an integer or is nil")
 	}
 	return strconv.Atoi(string(v.Raw))
 }
 
 func (v *Value) AsString() (string, error) {
-	switch v.typ {
+	switch v.Type {
 	case SimpleString, SimpleError, Integer, BulkString:
 		return string(v.Raw), nil
 	default:
@@ -119,7 +126,7 @@ func (v *Value) AsString() (string, error) {
 }
 
 func (v *Value) AsBool() (bool, error) {
-	if v.typ != Boolean || v.IsNil {
+	if v.Type != Boolean || v.IsNil {
 		return false, errors.New("value not a boolean or is nil")
 	}
 
@@ -127,27 +134,21 @@ func (v *Value) AsBool() (bool, error) {
 }
 
 func (v *Value) AsArray() ([]Value, error) {
-	if v.typ != Array || v.IsNil {
+	if v.Type != Array || v.IsNil {
 		return nil, errors.New("value not an array or is nil")
 	}
 	return v.Values, nil
 }
 
 func (v *Value) Marshal() ([]byte, error) {
-	switch v.typ {
-	case SimpleString:
-		return format(SimpleString, v.Raw), nil
-	case SimpleError:
-		return format(SimpleError, v.Raw), nil
-	case Integer:
-		return format(Integer, v.Raw), nil
-	case Null:
-		return format(Null, nil), nil
+	switch v.Type {
+	case SimpleString, SimpleError, Integer, Null:
+		return v.format(), nil
 	case BulkString:
 		if v.IsNil {
 			return []byte("$-1\r\n"), nil
 		}
-		return format(BulkString, []byte(fmt.Sprintf("%d\r\n%s", len(v.Raw), v.Raw))), nil
+		return v.format(), nil
 	case Array:
 		var b strings.Builder
 		b.Write([]byte(fmt.Sprintf("*%d\r\n", len(v.Values))))
@@ -167,11 +168,19 @@ func (v *Value) Marshal() ([]byte, error) {
 	return nil, errors.New("invalid data type")
 }
 
-func format(prefix DataType, raw []byte) []byte {
+func (v *Value) format() []byte {
 	var b bytes.Buffer
-	b.Write([]byte(string(prefix)))
-	b.Write(raw)
-	b.Write([]byte("\r\n"))
+	b.Write([]byte(string(v.Type)))
+
+	if v.Type == BulkString {
+		b.Write([]byte(fmt.Sprintf("%d\r\n", len(v.Raw))))
+	}
+
+	b.Write(v.Raw)
+
+	if !v.BulkLike {
+		b.Write([]byte("\r\n"))
+	}
 
 	return b.Bytes()
 }

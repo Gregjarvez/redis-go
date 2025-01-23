@@ -8,13 +8,13 @@ import (
 
 func TestStringValue(t *testing.T) {
 	v := StringValue("hello")
-	assert.Equal(t, SimpleString, v.typ, "StringValue should set the correct DataType")
+	assert.Equal(t, SimpleString, v.Type, "StringValue should set the correct DataType")
 	assert.Equal(t, []byte("hello"), v.Raw, "StringValue should set the correct Raw value")
 }
 
 func TestNullValue(t *testing.T) {
 	v := NullValue()
-	assert.Equal(t, Null, v.typ, "NullValue should have the DataType Null")
+	assert.Equal(t, Null, v.Type, "NullValue should have the DataType Null")
 	assert.True(t, v.IsNil, "NullValue should set IsNil to true")
 }
 
@@ -39,10 +39,10 @@ func TestValue_String(t *testing.T) {
 		value    Value
 		expected string
 	}{
-		{Value{typ: SimpleString, Raw: []byte("OK")}, "OK"},
-		{Value{typ: SimpleError, Raw: []byte("ERROR")}, "ERROR"},
-		{Value{typ: Integer, Raw: []byte("123")}, "123"},
-		{Value{typ: Array, Values: []Value{StringValue("A"), StringValue("B")}}, "[{false [65] 43 []} {false [66] 43 []}]"}, // fmt-style array output
+		{Value{Type: SimpleString, Raw: []byte("OK")}, "OK"},
+		{Value{Type: SimpleError, Raw: []byte("ERROR")}, "ERROR"},
+		{Value{Type: Integer, Raw: []byte("123")}, "123"},
+		{Value{Type: Array, Values: []Value{StringValue("A"), StringValue("B")}}, "[{false [65] 43 []} {false [66] 43 []}]"}, // fmt-style array output
 	}
 	for _, tt := range tests {
 		assert.Equal(t, tt.expected, tt.value.String(), "String() should return the expected string representation")
@@ -55,9 +55,9 @@ func TestValue_AsInt(t *testing.T) {
 		expected int
 		err      error
 	}{
-		{Value{typ: Integer, Raw: []byte("123")}, 123, nil},
-		{Value{typ: Integer, IsNil: true}, 0, errors.New("value not an integer or is nil")},
-		{Value{typ: SimpleString, Raw: []byte("NOT_INT")}, 0, errors.New("value not an integer or is nil")},
+		{Value{Type: Integer, Raw: []byte("123")}, 123, nil},
+		{Value{Type: Integer, IsNil: true}, 0, errors.New("value not an integer or is nil")},
+		{Value{Type: SimpleString, Raw: []byte("NOT_INT")}, 0, errors.New("value not an integer or is nil")},
 	}
 	for _, tt := range tests {
 		result, err := tt.value.AsInt()
@@ -76,10 +76,10 @@ func TestValue_AsString(t *testing.T) {
 		expected string
 		err      error
 	}{
-		{Value{typ: SimpleString, Raw: []byte("OK")}, "OK", nil},
-		{Value{typ: BulkString, Raw: []byte("BULK")}, "BULK", nil},
-		{Value{typ: Integer, Raw: []byte("123")}, "123", nil},
-		{Value{typ: Array, Values: []Value{}}, "", errors.New("value not a string")},
+		{Value{Type: SimpleString, Raw: []byte("OK")}, "OK", nil},
+		{Value{Type: BulkString, Raw: []byte("BULK")}, "BULK", nil},
+		{Value{Type: Integer, Raw: []byte("123")}, "123", nil},
+		{Value{Type: Array, Values: []Value{}}, "", errors.New("value not a string")},
 	}
 	for _, tt := range tests {
 		result, err := tt.value.AsString()
@@ -98,10 +98,10 @@ func TestValue_AsBool(t *testing.T) {
 		expected bool
 		err      error
 	}{
-		{Value{typ: Boolean, Raw: []byte(TrueValue)}, true, nil},
-		{Value{typ: Boolean, Raw: []byte("f")}, false, nil},
-		{Value{typ: Boolean, IsNil: true}, false, errors.New("value not a boolean or is nil")},
-		{Value{typ: SimpleString, Raw: []byte("not_bool")}, false, errors.New("value not a boolean or is nil")},
+		{Value{Type: Boolean, Raw: []byte(TrueValue)}, true, nil},
+		{Value{Type: Boolean, Raw: []byte("f")}, false, nil},
+		{Value{Type: Boolean, IsNil: true}, false, errors.New("value not a boolean or is nil")},
+		{Value{Type: SimpleString, Raw: []byte("not_bool")}, false, errors.New("value not a boolean or is nil")},
 	}
 	for _, tt := range tests {
 		result, err := tt.value.AsBool()
@@ -120,9 +120,9 @@ func TestValue_AsArray(t *testing.T) {
 		expected []Value
 		err      error
 	}{
-		{Value{typ: Array, Values: []Value{StringValue("A"), StringValue("B")}}, []Value{StringValue("A"), StringValue("B")}, nil},
-		{Value{typ: Array, IsNil: true}, nil, errors.New("value not an array or is nil")},
-		{Value{typ: SimpleString, Raw: []byte("not_array")}, nil, errors.New("value not an array or is nil")},
+		{Value{Type: Array, Values: []Value{StringValue("A"), StringValue("B")}}, []Value{StringValue("A"), StringValue("B")}, nil},
+		{Value{Type: Array, IsNil: true}, nil, errors.New("value not an array or is nil")},
+		{Value{Type: SimpleString, Raw: []byte("not_array")}, nil, errors.New("value not an array or is nil")},
 	}
 	for _, tt := range tests {
 		result, err := tt.value.AsArray()
@@ -141,13 +141,13 @@ func TestValue_Marshal(t *testing.T) {
 		expected string
 		err      error
 	}{
-		{Value{typ: SimpleString, Raw: []byte("OK")}, "+OK\r\n", nil},
-		{Value{typ: SimpleError, Raw: []byte("ERROR")}, "-ERROR\r\n", nil},
-		{Value{typ: Integer, Raw: []byte("123")}, ":123\r\n", nil},
-		{Value{typ: Null, IsNil: true}, "_\r\n", nil},
-		{Value{typ: BulkString, Raw: []byte("BULK")}, "$4\r\nBULK\r\n", nil},
-		{Value{typ: BulkString, IsNil: true}, "$-1\r\n", nil},
-		{Value{typ: Array, Values: []Value{StringValue("A"), StringValue("B")}}, "*2\r\n+A\r\n+B\r\n", nil},
+		{Value{Type: SimpleString, Raw: []byte("OK")}, "+OK\r\n", nil},
+		{Value{Type: SimpleError, Raw: []byte("ERROR")}, "-ERROR\r\n", nil},
+		{Value{Type: Integer, Raw: []byte("123")}, ":123\r\n", nil},
+		{Value{Type: Null, IsNil: true}, "_\r\n", nil},
+		{Value{Type: BulkString, Raw: []byte("BULK")}, "$4\r\nBULK\r\n", nil},
+		{Value{Type: BulkString, IsNil: true}, "$-1\r\n", nil},
+		{Value{Type: Array, Values: []Value{StringValue("A"), StringValue("B")}}, "*2\r\n+A\r\n+B\r\n", nil},
 	}
 	for _, tt := range tests {
 		result, err := tt.value.Marshal()

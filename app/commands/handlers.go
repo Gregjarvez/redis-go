@@ -21,7 +21,7 @@ func (c *commandRouter) canHandle(cmd string) bool {
 	return ok
 }
 
-func (c *commandRouter) Handle(cmd Command, s ServerContext) (result resp.Value, err error) {
+func (c *commandRouter) Handle(cmd Command, s ServerContext) (resp.Value, error) {
 	typ := strings.ToUpper(cmd.Type)
 
 	if !c.canHandle(typ) {
@@ -153,11 +153,14 @@ func replConfigHandler(c Command, _ ServerContext) (resp.Value, error) {
 }
 
 func pSyncHandler(_ Command, s ServerContext) (resp.Value, error) {
-	return resp.BulkStringValue(
-		fmt.Sprintf(
-			"FULLRESYNC %s %v",
-			s.Info.MasterReplid,
-			s.Info.MasterReplOffset,
+	return resp.FlatArrayValue(
+		resp.BulkStringValue(
+			fmt.Sprintf(
+				"FULLRESYNC %s %v",
+				s.Info.MasterReplid,
+				s.Info.MasterReplOffset,
+			),
 		),
+		resp.Value{Type: resp.BulkString, Raw: s.Store.Dump(), BulkLike: true},
 	), nil
 }

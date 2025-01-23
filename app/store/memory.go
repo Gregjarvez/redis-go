@@ -1,6 +1,7 @@
 package store
 
 import (
+	"encoding/hex"
 	"fmt"
 	"github.com/codecrafters-io/redis-starter-go/app/config"
 	"github.com/codecrafters-io/redis-starter-go/app/rdb"
@@ -63,14 +64,19 @@ func (m *Memory) Keys() []string {
 }
 
 func (m *Memory) Hydrate() {
-	dumpFile := fmt.Sprintf("%s/%s", *config.Config.Dir, *config.Config.DbFilename)
-	if dumpFile == "" {
-		fmt.Println("No dumpFile file provided")
+	var (
+		dir        = *config.Config.Dir
+		dbFilename = *config.Config.DbFilename
+	)
+
+	if dir == "" || dbFilename == "" {
 		return
 	}
 
+	dumpFile := fmt.Sprintf("%s/%s", dir, dbFilename)
+
 	if _, err := os.Stat(dumpFile); os.IsNotExist(err) {
-		fmt.Println("No dumpFile file found")
+		fmt.Println("No dump file found")
 		return
 	}
 
@@ -107,4 +113,10 @@ func (m *Memory) Hydrate() {
 			TTL:   ttl,
 		}
 	}
+}
+
+func (m *Memory) Dump() []byte {
+	// @todo create dump from memory store - currency just a hex encoded empty redis dump file
+	file, _ := hex.DecodeString("524544495330303131fa0972656469732d76657205372e322e30fa0a72656469732d62697473c040fa056374696d65c26d08bc65fa08757365642d6d656dc2b0c41000fa08616f662d62617365c000fff06e3bfec0ff5aa2")
+	return file
 }

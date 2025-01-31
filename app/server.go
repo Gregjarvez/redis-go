@@ -49,12 +49,16 @@ func NewTcpServer(listAddr string) (tcp.Server, error) {
 	s.Hydrate()
 
 	baseServer := &tcp.BaseServer{
-		ListAddr:   listAddr,
-		Listener:   ln,
-		Connection: make(chan net.Conn),
-		Shutdown:   make(chan struct{}),
-		Datastore:  s,
-		Info:       info,
+		ListAddr:    listAddr,
+		Listener:    ln,
+		Connections: make(chan net.Conn),
+		Shutdown:    make(chan struct{}),
+		Datastore:   s,
+		Info:        info,
+	}
+
+	if info.IsMaster() {
+		baseServer.CommandsChannel = make(chan []byte, 100)
 	}
 
 	switch info.Role {

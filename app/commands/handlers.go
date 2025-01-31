@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-type commandHandler func(c Command, s ServerContext) (result resp.Value, err error)
+type commandHandler func(c Command, s RequestContext) (result resp.Value, err error)
 
 type commandRouter struct {
 	handlers map[string]commandHandler
@@ -21,7 +21,7 @@ func (c *commandRouter) canHandle(cmd string) bool {
 	return ok
 }
 
-func (c *commandRouter) Handle(cmd Command, s ServerContext) (resp.Value, error) {
+func (c *commandRouter) Handle(cmd Command, s RequestContext) (resp.Value, error) {
 	typ := strings.ToUpper(cmd.Type)
 
 	if !c.canHandle(typ) {
@@ -45,15 +45,15 @@ var DefaultHandlers = commandRouter{
 	},
 }
 
-func pingHandler(_ Command, _ ServerContext) (resp.Value, error) {
+func pingHandler(_ Command, _ RequestContext) (resp.Value, error) {
 	return resp.StringValue("PONG"), nil
 }
 
-func echoHandler(c Command, _ ServerContext) (resp.Value, error) {
+func echoHandler(c Command, _ RequestContext) (resp.Value, error) {
 	return resp.BulkStringValue(c.Args[0]), nil
 }
 
-func getHandler(c Command, context ServerContext) (resp.Value, error) {
+func getHandler(c Command, context RequestContext) (resp.Value, error) {
 	if len(c.Args) == 0 {
 		err := errors.New("no key provided")
 		return resp.ErrorValue(err.Error()), err
@@ -69,7 +69,7 @@ func getHandler(c Command, context ServerContext) (resp.Value, error) {
 	return resp.BulkStringValue(record.String()), nil
 }
 
-func setHandler(c Command, context ServerContext) (resp.Value, error) {
+func setHandler(c Command, context RequestContext) (resp.Value, error) {
 	now := time.Now()
 	args, err := parseSetCommandOptions(c.Args)
 
@@ -95,7 +95,7 @@ func setHandler(c Command, context ServerContext) (resp.Value, error) {
 	return resp.StringValue("OK"), nil
 }
 
-func configHandler(c Command, _ ServerContext) (result resp.Value, err error) {
+func configHandler(c Command, _ RequestContext) (result resp.Value, err error) {
 	cmd := c.Args[0]
 	arg := c.Args[1]
 
@@ -113,7 +113,7 @@ func configHandler(c Command, _ ServerContext) (result resp.Value, err error) {
 	}
 }
 
-func keysHandler(c Command, context ServerContext) (resp.Value, error) {
+func keysHandler(c Command, context RequestContext) (resp.Value, error) {
 	if len(c.Args) == 0 {
 		err := errors.New("no pattern provided")
 		return resp.ErrorValue(err.Error()), err
@@ -134,7 +134,7 @@ func keysHandler(c Command, context ServerContext) (resp.Value, error) {
 	return resp.ArrayValue(keysToResp...), nil
 }
 
-func infoHandler(c Command, context ServerContext) (resp.Value, error) {
+func infoHandler(c Command, context RequestContext) (resp.Value, error) {
 	if len(c.Args) == 0 {
 		return resp.ErrorValue("ERR: no arguments provided"), nil
 	}
@@ -148,11 +148,16 @@ func infoHandler(c Command, context ServerContext) (resp.Value, error) {
 	}
 }
 
-func replConfigHandler(c Command, _ ServerContext) (resp.Value, error) {
+func replConfigHandler(c Command, _ RequestContext) (resp.Value, error) {
+
 	return resp.BulkStringValue("OK"), nil
 }
 
-func pSyncHandler(_ Command, s ServerContext) (resp.Value, error) {
+func pSyncHandler(c Command, s RequestContext) (resp.Value, error) {
+	if len(c.Args) > 0 && c.Args[0] == "?" {
+		s.Info.AddReplica(s.Conn)
+	}
+
 	return resp.FlatArrayValue(
 		resp.BulkStringValue(
 			fmt.Sprintf(

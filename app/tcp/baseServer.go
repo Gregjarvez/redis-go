@@ -20,13 +20,15 @@ type Server interface {
 }
 
 type BaseServer struct {
-	ListAddr   string
-	Listener   net.Listener
-	Shutdown   chan struct{}
-	Datastore  store.DataStore
-	wg         sync.WaitGroup
-	Connection chan net.Conn
-	Info       config.Info
+	ListAddr    string
+	Listener    net.Listener
+	Shutdown    chan struct{}
+	Datastore   store.DataStore
+	wg          sync.WaitGroup
+	Connections chan net.Conn
+	Info        config.Info
+
+	CommandsChannel chan []byte
 }
 
 func (s *BaseServer) StartListener() {
@@ -65,7 +67,7 @@ func (s *BaseServer) acceptConnections() {
 			if err != nil {
 				continue
 			}
-			s.Connection <- conn
+			s.Connections <- conn
 		}
 	}
 }
@@ -77,7 +79,7 @@ func (s *BaseServer) handleConnections() {
 		select {
 		case <-s.Shutdown:
 			return
-		case conn := <-s.Connection:
+		case conn := <-s.Connections:
 			go s.handleConnection(conn)
 		default:
 			// do nothing
@@ -119,18 +121,15 @@ func (s *BaseServer) handleConnection(conn net.Conn) {
 				continue
 			}
 
-			results, execErr := com.Execute(commands.DefaultHandlers, commands.ServerContext{
+			results, execErr := com.Execute(commands.DefaultHandlers, commands.RequestContext{
 				Store: s.Datastore,
 				Info:  s.Info,
+				Conn:  &conn,
 			})
 
 			if execErr != nil {
 				conn.Write([]byte(fmt.Sprintf("-ERR %v\r\n", execErr.Error()))) //nolint:errcheck
 				fmt.Println("Error writing to connection:", execErr)
-				continue
-			}
-
-			if len(results) == 0 {
 				continue
 			}
 
@@ -140,6 +139,11 @@ func (s *BaseServer) handleConnection(conn net.Conn) {
 				c.Write(result)
 				c.Flush()
 			}
+
+			if s.Info.IsMaster() && com.Propagate {
+				s.CommandsChannel <- com.Raw
+			}
+
 			content.Reset()
 		}
 	}

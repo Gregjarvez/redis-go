@@ -149,12 +149,12 @@ func infoHandler(c Command, context RequestContext) (resp.Value, error) {
 }
 
 func replConfigHandler(c Command, _ RequestContext) (resp.Value, error) {
-
 	return resp.BulkStringValue("OK"), nil
 }
 
 func pSyncHandler(c Command, s RequestContext) (resp.Value, error) {
 	if len(c.Args) > 0 && c.Args[0] == "?" {
+		fmt.Println("Saving replica connection")
 		s.Info.AddReplica(s.Conn)
 	}
 

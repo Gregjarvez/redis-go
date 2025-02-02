@@ -2,6 +2,7 @@ package tcp
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"github.com/codecrafters-io/redis-starter-go/app/commands/resp"
@@ -18,7 +19,7 @@ type SlaveServer struct {
 
 func (m *SlaveServer) Start() {
 	m.StartListener()
-	m.connnectToMaster()
+	m.connectToMaster()
 }
 
 func (m *SlaveServer) Stop() {
@@ -27,7 +28,7 @@ func (m *SlaveServer) Stop() {
 
 var connectionError = errors.New("error connecting to master")
 
-func (m *SlaveServer) connnectToMaster() {
+func (m *SlaveServer) connectToMaster() {
 	s := strings.Split(*config.Config.ReplicaOf, " ")
 	conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%s", s[0], s[1]), 5*time.Second)
 
@@ -47,7 +48,7 @@ func (m *SlaveServer) connnectToMaster() {
 
 	response = readResponse(conn)
 
-	if response != "+PONG" {
+	if response != "PONG" {
 		panic(connectionError)
 	}
 
@@ -71,18 +72,15 @@ func sendREPLCONF(conn net.Conn, params ...string) {
 
 	response, _ := repleConf.Marshal()
 	_, err := writer.Write(response)
+	writer.Flush()
 
-	if err != nil {
-		return
-	}
-
-	err = writer.Flush()
 	if err != nil {
 		return
 	}
 
 	r := readResponse(conn)
-	if r != "+OK" {
+
+	if r != "OK" {
 		panic(connectionError)
 	}
 }
@@ -102,7 +100,15 @@ func sendPSYNC(conn net.Conn, replid, offset string) {
 }
 
 func readResponse(conn net.Conn) string {
-	reader := bufio.NewReader(conn)
-	line, _, _ := reader.ReadLine()
-	return string(line)
+	buf := make([]byte, 1024)
+	n, _ := conn.Read(buf)
+	value, _, err := resp.NewReader(bytes.NewReader(buf[:n])).ReadValue()
+
+	if err != nil {
+		fmt.Println(err)
+		return ""
+	}
+
+	v, _ := value.AsString()
+	return v
 }

@@ -60,6 +60,11 @@ func shouldPropagate(c string) bool {
 	return s == "SET" || s == "DEL"
 }
 
+func shouldRespond(c string) bool {
+	s := strings.ToUpper(c)
+	return (s != "SET" && s != "DEL") && *config.Config.ReplicaOf != ""
+}
+
 func (c Command) Execute(handler commandRouter, s RequestContext) ([][]byte, error) {
 	res, err := handler.Handle(c, s)
 

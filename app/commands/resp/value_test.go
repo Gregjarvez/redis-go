@@ -42,7 +42,7 @@ func TestValue_String(t *testing.T) {
 		{Value{Type: SimpleString, Raw: []byte("OK")}, "OK"},
 		{Value{Type: SimpleError, Raw: []byte("ERROR")}, "ERROR"},
 		{Value{Type: Integer, Raw: []byte("123")}, "123"},
-		{Value{Type: Array, Values: []Value{StringValue("A"), StringValue("B")}}, "[{false [65] 43 []} {false [66] 43 []}]"}, // fmt-style array output
+		{Value{Type: Array, Values: []Value{StringValue("A"), StringValue("B")}}, "[{false [65] SimpleString [] false false} {false [66] SimpleString [] false false}]"}, // fmt-style array output
 	}
 	for _, tt := range tests {
 		assert.Equal(t, tt.expected, tt.value.String(), "String() should return the expected string representation")

@@ -35,7 +35,6 @@ func (m *SlaveServer) connectToMaster() {
 	if err != nil {
 		panic(connectionError)
 	}
-	defer conn.Close()
 
 	writer := bufio.NewWriter(conn)
 
@@ -55,6 +54,8 @@ func (m *SlaveServer) connectToMaster() {
 	sendREPLCONF(conn, "listening-port", strconv.Itoa(*config.Config.Port))
 	sendREPLCONF(conn, "capa", "eof", "capa", "psync2")
 	sendPSYNC(conn, "?", "-1")
+
+	m.handleConnection(conn)
 }
 
 func sendREPLCONF(conn net.Conn, params ...string) {

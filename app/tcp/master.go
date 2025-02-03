@@ -2,8 +2,7 @@ package tcp
 
 import (
 	"fmt"
-	"io"
-	"net"
+	"github.com/codecrafters-io/redis-starter-go/app/config"
 )
 
 type MasterServer struct {
@@ -12,7 +11,7 @@ type MasterServer struct {
 
 func (m *MasterServer) Start() {
 	m.StartListener()
-	m.BroadCastCommands()
+	go m.BroadCastCommands()
 }
 
 func (m *MasterServer) Stop() {
@@ -20,6 +19,7 @@ func (m *MasterServer) Stop() {
 }
 
 func (m *MasterServer) BroadCastCommands() {
+	fmt.Println("Broadcasting commands")
 	for {
 		select {
 		case command := <-m.CommandsChannel:
@@ -31,21 +31,24 @@ func (m *MasterServer) BroadCastCommands() {
 }
 
 func (m *MasterServer) Broadcast(command []byte) {
-	for k, c := range m.Info.Replicas {
-		go func(k string, c *net.Conn) {
+	m.Info.ReplicaMutex.RLock()
+	defer m.Info.ReplicaMutex.RUnlock()
+
+	for _, replica := range m.Info.Replicas {
+		fmt.Println("Broadcasting command to:", (*replica.Conn).RemoteAddr())
+		go func(r *config.Replica) {
 			defer func() {
 				if r := recover(); r != nil {
 					fmt.Println("Recovered from panic:", r)
 				}
 			}()
-
-			_, err := (*c).Write(command)
-			if err != nil {
-				if err == io.EOF {
-					m.Info.RemoveReplica(k)
-				}
-				fmt.Println("Error writing to replica: ", err)
+			select {
+			case r.Queue <- command:
+				// Successfully queued
+			default:
+				fmt.Println("Replica write queue full:", (*r.Conn).RemoteAddr())
 			}
-		}(k, c)
+
+		}(replica)
 	}
 }

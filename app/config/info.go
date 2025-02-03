@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"net"
 	"strings"
 	"sync"
@@ -16,11 +17,19 @@ const (
 	Slave  Role = "slave"
 )
 
+type Replica struct {
+	Mu    sync.Mutex
+	Conn  *net.Conn
+	Queue chan []byte
+}
+
 type Info struct {
 	Role             Role
 	MasterReplid     string
 	MasterReplOffset int64
-	Replicas         map[string]*net.Conn
+
+	ReplicaMutex sync.RWMutex
+	Replicas     map[string]*Replica
 }
 
 func NewInfo(config Configuration) Info {
@@ -42,7 +51,7 @@ func NewInfo(config Configuration) Info {
 	}
 
 	if role == Master {
-		info.Replicas = make(map[string]*net.Conn)
+		info.Replicas = make(map[string]*Replica)
 	}
 
 	return info
@@ -74,18 +83,43 @@ func (i *Info) IsMaster() bool {
 
 func (i *Info) AddReplica(conn *net.Conn) {
 	if !i.IsMaster() {
+		fmt.Println("Not a master, cannot add replica")
 		return
 	}
 
-	i.Replicas[(*conn).RemoteAddr().String()] = conn
+	i.ReplicaMutex.Lock()
+	defer i.ReplicaMutex.Unlock()
+
+	key := (*conn).RemoteAddr().String()
+	replica := &Replica{Conn: conn, Queue: make(chan []byte, 100)}
+
+	i.Replicas[key] = replica
+
+	go func(r *Replica) {
+		conn := *r.Conn
+
+		defer i.RemoveReplica(key)
+		defer conn.Close()
+
+		for cmd := range r.Queue {
+			_, err := conn.Write(cmd)
+			if err != nil {
+				if err == io.EOF {
+					fmt.Println("Replica disconnected:", conn.RemoteAddr())
+				} else {
+					fmt.Println("Error writing to replica:", err)
+				}
+				return
+			}
+		}
+	}(replica)
 }
 
 func (i *Info) RemoveReplica(k string) {
-	var mu sync.Mutex
-	(*i.Replicas[k]).Close()
-	mu.Lock()
+	i.ReplicaMutex.Lock()
+	defer i.ReplicaMutex.Unlock()
 
+	(*i.Replicas[k].Conn).Close()
+	close(i.Replicas[k].Queue)
 	delete(i.Replicas, k)
-	mu.Unlock()
-
 }

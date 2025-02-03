@@ -10,6 +10,7 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/store"
 	"io"
 	"net"
+	"strings"
 	"sync"
 	"time"
 )
@@ -20,13 +21,15 @@ type Server interface {
 }
 
 type BaseServer struct {
-	ListAddr    string
-	Listener    net.Listener
-	Shutdown    chan struct{}
-	Datastore   store.DataStore
+	ListAddr  string
+	Listener  net.Listener
+	Shutdown  chan struct{}
+	Datastore store.DataStore
+
 	wg          sync.WaitGroup
 	Connections chan net.Conn
-	Info        config.Info
+
+	Info config.Info
 
 	CommandsChannel chan []byte
 }
@@ -88,10 +91,11 @@ func (s *BaseServer) handleConnections() {
 }
 
 func (s *BaseServer) handleConnection(conn net.Conn) {
-	defer conn.Close()
-
-	var content bytes.Buffer
-	buf := make([]byte, 256)
+	var (
+		content             bytes.Buffer
+		buf                 = make([]byte, 256)
+		isReplicaConnection bool
+	)
 
 	for {
 		n, err := conn.Read(buf)
@@ -109,17 +113,22 @@ func (s *BaseServer) handleConnection(conn net.Conn) {
 		for {
 			value, _, err := resp.NewReader(&content).ReadValue()
 			if err != nil {
-				break
+				if err == io.EOF {
+					break
+				}
+				fmt.Println("Failed to read value: ", err)
+				continue
 			}
 
 			// Process the command
 			com, err := commands.NewCommand(value)
 
 			if err != nil {
-				_, werr := conn.Write([]byte(fmt.Sprintf("-ERR %v\r\n", err.Error())))
-				fmt.Println("Error writing to connection:", werr)
+				fmt.Println("Failed to create command: ", err)
 				continue
 			}
+
+			fmt.Println("Received Command:", com.String())
 
 			results, execErr := com.Execute(commands.DefaultHandlers, commands.RequestContext{
 				Store: s.Datastore,
@@ -129,22 +138,34 @@ func (s *BaseServer) handleConnection(conn net.Conn) {
 
 			if execErr != nil {
 				conn.Write([]byte(fmt.Sprintf("-ERR %v\r\n", execErr.Error()))) //nolint:errcheck
-				fmt.Println("Error writing to connection:", execErr)
 				continue
 			}
 
 			c := bufio.NewWriter(conn)
 
-			for _, result := range results {
-				c.Write(result)
-				c.Flush()
+			if strings.ToUpper(com.Type) == "PSYNC" && len(com.Args) > 0 && com.Args[0] == "?" {
+				fmt.Println("Saving replica connection")
+				s.Info.AddReplica(&conn)
+				isReplicaConnection = true
+			}
+
+			if len(results) > 0 {
+				for _, result := range results {
+					c.Write(result)
+					c.Flush()
+				}
 			}
 
 			if s.Info.IsMaster() && com.Propagate {
+				fmt.Println("Propagating command to replicas ", com.String())
 				s.CommandsChannel <- com.Raw
 			}
 
 			content.Reset()
+
+			if isReplicaConnection {
+				break
+			}
 		}
 	}
 }

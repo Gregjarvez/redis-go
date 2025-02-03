@@ -2,6 +2,7 @@ package commands
 
 import (
 	"errors"
+	"fmt"
 	"github.com/codecrafters-io/redis-starter-go/app/commands/resp"
 	"github.com/codecrafters-io/redis-starter-go/app/config"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
@@ -60,19 +61,23 @@ func shouldPropagate(c string) bool {
 	return s == "SET" || s == "DEL"
 }
 
-func shouldRespond(c string) bool {
-	s := strings.ToUpper(c)
-	return (s != "SET" && s != "DEL") && *config.Config.ReplicaOf != ""
+func isPropagatedCommand(c string) bool {
+	return shouldPropagate(c)
 }
 
-func (c Command) Execute(handler commandRouter, s RequestContext) ([][]byte, error) {
-	res, err := handler.Handle(c, s)
+func (c *Command) Execute(handler commandRouter, s RequestContext) ([][]byte, error) {
+	res, err := handler.Handle(*c, s)
 
 	if err != nil {
 		return nil, err
 	}
 
 	var responses [][]byte
+
+	// slave server should not respond to propagated commands SET and DEL
+	if !s.Info.IsMaster() && isPropagatedCommand(c.Type) {
+		return responses, nil
+	}
 
 	if res.Type == resp.Array && res.Flatten {
 		for _, v := range res.Values {
@@ -94,4 +99,8 @@ func (c Command) Execute(handler commandRouter, s RequestContext) ([][]byte, err
 	}
 
 	return append(responses, r), nil
+}
+
+func (c *Command) String() string {
+	return fmt.Sprintf("Command: [%s %s]", c.Type, strings.Join(c.Args, " "))
 }

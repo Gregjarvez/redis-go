@@ -3,9 +3,8 @@ package store
 import (
 	"encoding/hex"
 	"fmt"
-	"github.com/codecrafters-io/redis-starter-go/app/config"
 	"github.com/codecrafters-io/redis-starter-go/app/rdb"
-	"os"
+	"io"
 	"sync"
 	"time"
 )
@@ -63,42 +62,18 @@ func (m *Memory) Keys() []string {
 	return keys
 }
 
-func (m *Memory) Hydrate() {
-	var (
-		dir        = *config.Config.Dir
-		dbFilename = *config.Config.DbFilename
-	)
-
-	if dir == "" || dbFilename == "" {
-		return
-	}
-
-	dumpFile := fmt.Sprintf("%s/%s", dir, dbFilename)
-
-	if _, err := os.Stat(dumpFile); os.IsNotExist(err) {
-		fmt.Println("No dump file found")
-		return
-	}
-
-	fmt.Println("Hydrating memory store from dumpFile file")
-	f, err := os.Open(dumpFile)
-
-	if err != nil {
-		fmt.Println("Error opening dumpFile file")
-		return
-	}
-
-	defer f.Close()
-
-	parser := rdb.NewParser(f)
-	err = parser.Parse()
+func (m *Memory) Hydrate(r io.Reader) error {
+	parser := rdb.NewParser(r)
+	err := parser.Parse()
 
 	if err != nil {
 		fmt.Println("Error parsing dumpFile file")
+		return err
 	}
+
 	if len(parser.Context.Databases) == 0 {
 		fmt.Println("No databases found in dumpFile file")
-		return
+		return nil
 	}
 
 	for _, record := range parser.Context.Databases[0].Entries {
@@ -113,6 +88,8 @@ func (m *Memory) Hydrate() {
 			TTL:   ttl,
 		}
 	}
+
+	return nil
 }
 
 func (m *Memory) Dump() []byte {

@@ -2,11 +2,11 @@ package tcp
 
 import (
 	"bufio"
-	"bytes"
 	"errors"
 	"fmt"
 	"github.com/codecrafters-io/redis-starter-go/app/commands/resp"
 	"github.com/codecrafters-io/redis-starter-go/app/config"
+	"io"
 	"net"
 	"strconv"
 	"strings"
@@ -36,29 +36,15 @@ func (m *SlaveServer) connectToMaster() {
 		panic(connectionError)
 	}
 
-	writer := bufio.NewWriter(conn)
-
-	var response string
-
-	ping := resp.ArrayValue(resp.BulkStringValue("PING"))
-	r, _ := ping.Marshal()
-	writer.Write(r)
-	writer.Flush()
-
-	response = readResponse(conn)
-
-	if response != "PONG" {
-		panic(connectionError)
-	}
-
-	sendREPLCONF(conn, "listening-port", strconv.Itoa(*config.Config.Port))
-	sendREPLCONF(conn, "capa", "eof", "capa", "psync2")
-	sendPSYNC(conn, "?", "-1")
+	ping(conn)
+	replConf(conn, "listening-port", strconv.Itoa(*config.Config.Port))
+	replConf(conn, "capa", "eof", "capa", "psync2")
+	psync(conn, "?", "-1")
 
 	m.handleConnection(conn)
 }
 
-func sendREPLCONF(conn net.Conn, params ...string) {
+func replConf(conn net.Conn, params ...string) {
 	args := make([]resp.Value, 0, len(params)+1)
 	args = append(args, resp.BulkStringValue("REPLCONF"))
 
@@ -75,18 +61,20 @@ func sendREPLCONF(conn net.Conn, params ...string) {
 	_, err := writer.Write(response)
 	writer.Flush()
 
+	r, _, err := resp.NewReader(conn).ReadSimpleValue(resp.SimpleString)
+
 	if err != nil {
-		return
+		panic(err)
 	}
 
-	r := readResponse(conn)
+	fmt.Println("REPLCONF response: ", r.String())
 
-	if r != "OK" {
-		panic(connectionError)
+	if r.String() != "+OK" {
+		fmt.Println("Ping failed - invalid response")
 	}
 }
 
-func sendPSYNC(conn net.Conn, replid, offset string) {
+func psync(conn net.Conn, replid, offset string) {
 	writer := bufio.NewWriter(conn)
 	psync := resp.ArrayValue(
 		resp.BulkStringValue("PSYNC"),
@@ -97,19 +85,70 @@ func sendPSYNC(conn net.Conn, replid, offset string) {
 	writer.Write(response)
 	writer.Flush()
 
-	_ = readResponse(conn)
-}
-
-func readResponse(conn net.Conn) string {
-	buf := make([]byte, 1024)
-	n, _ := conn.Read(buf)
-	value, _, err := resp.NewReader(bytes.NewReader(buf[:n])).ReadValue()
+	r, _, err := resp.NewReader(conn).ReadSimpleValue(resp.SimpleString)
 
 	if err != nil {
-		fmt.Println(err)
-		return ""
+		panic(err)
 	}
 
-	v, _ := value.AsString()
-	return v
+	fmt.Println("PSYNC response: ", r.String())
+
+	ignoreRDB(conn)
+}
+
+func ping(conn net.Conn) {
+	writer := bufio.NewWriter(conn)
+	ping := resp.ArrayValue(
+		resp.BulkStringValue("PING"),
+	)
+	response, _ := ping.Marshal()
+	writer.Write(response)
+	writer.Flush()
+
+	r, _, err := resp.NewReader(conn).ReadSimpleValue(resp.SimpleString)
+
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println("Ping response: ", r.String())
+
+	if r.String() != "+PONG" {
+		fmt.Println("Ping failed - invalid response")
+	}
+}
+
+func ignoreRDB(conn net.Conn) error {
+	reader := bufio.NewReader(conn)
+
+	firstLine, err := reader.ReadString('\n')
+	if err != nil {
+		return fmt.Errorf("failed to read RDB length: %v", err)
+	}
+
+	if !strings.HasPrefix(firstLine, "$") {
+		return fmt.Errorf("unexpected response, not a bulk RDB file: %s", firstLine)
+	}
+
+	length, err := strconv.Atoi(strings.TrimPrefix(strings.TrimSpace(firstLine), "$"))
+
+	if err != nil {
+		return fmt.Errorf("invalid RDB length: %v", err)
+	}
+
+	fmt.Printf("RDB file length: %d\n", length)
+
+	_, err = io.CopyN(io.Discard, reader, int64(length))
+	if err != nil {
+		return fmt.Errorf("failed to skip RDB file: %v", err)
+	}
+
+	// Read the final \r\n after the bulk string
+	_, err = reader.ReadString('\n')
+	if err != nil {
+		return fmt.Errorf("failed to consume final line after RDB: %v", err)
+	}
+
+	fmt.Println("RDB file ignored successfully")
+	return nil
 }

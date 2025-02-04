@@ -10,6 +10,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 )
 
@@ -46,7 +47,26 @@ func NewTcpServer(listAddr string) (tcp.Server, error) {
 		return nil, err
 	}
 	s := store.NewMemory()
-	s.Hydrate()
+
+	var (
+		dir        = *config.Config.Dir
+		dbFilename = *config.Config.DbFilename
+	)
+
+	if dir != "" && dbFilename != "" {
+		dumpFile := filepath.Join(dir, dbFilename)
+		_, err := os.Stat(dumpFile)
+
+		if err == nil || !os.IsNotExist(err) {
+			fmt.Println("Hydrating memory store from dumpFile file")
+			f, err := os.Open(dumpFile)
+
+			if err == nil {
+				defer f.Close()
+				s.Hydrate(f)
+			}
+		}
+	}
 
 	baseServer := &tcp.BaseServer{
 		ListAddr:    listAddr,

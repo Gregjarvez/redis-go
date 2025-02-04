@@ -34,19 +34,19 @@ func (r *Reader) ReadValue() (value Value, n int, err error) {
 
 	switch t {
 	case SimpleString, SimpleError, Null, Boolean:
-		return r.readSimpleValue(t)
+		return r.ReadSimpleValue(t)
 	case Integer:
-		return r.readInteger()
+		return r.ReadInteger()
 	case BulkString:
-		return r.readBulkString()
+		return r.ReadBulkString()
 	case Array:
-		return r.readArrayValue()
+		return r.ReadArrayValue()
 	}
 
 	return nullValue, *r.size, InvalidDataType
 }
 
-func (r *Reader) readSimpleValue(typ DataType) (Value, int, error) {
+func (r *Reader) ReadSimpleValue(typ DataType) (Value, int, error) {
 	if typ == Null {
 		return nullValue, 0, nil
 	}
@@ -66,7 +66,7 @@ func (r *Reader) readSimpleValue(typ DataType) (Value, int, error) {
 
 }
 
-func (r *Reader) readInteger() (Value, int, error) {
+func (r *Reader) ReadInteger() (Value, int, error) {
 	line, _, err := r.rd.ReadLine()
 
 	if err != nil {
@@ -79,7 +79,7 @@ func (r *Reader) readInteger() (Value, int, error) {
 	}, *r.size, nil
 }
 
-func (r *Reader) readBulkString() (Value, int, error) {
+func (r *Reader) ReadBulkString() (Value, int, error) {
 	length, err := r.readInt()
 
 	if err != nil {
@@ -119,7 +119,7 @@ func (r *Reader) readInt() (x int, err error) {
 	return int(i), nil
 }
 
-func (r *Reader) readArrayValue() (Value, int, error) {
+func (r *Reader) ReadArrayValue() (Value, int, error) {
 	length, err := r.readInt()
 
 	if err != nil {

@@ -128,7 +128,7 @@ func (s *BaseServer) handleConnection(conn net.Conn) {
 				continue
 			}
 
-			fmt.Println("Received Command:", com.String())
+			fmt.Printf("\n %s - Received Command: %s", strings.ToUpper(string(s.Info.Role)), com.String())
 
 			results, execErr := com.Execute(commands.DefaultHandlers, commands.RequestContext{
 				Store: s.Datastore,
@@ -151,6 +151,7 @@ func (s *BaseServer) handleConnection(conn net.Conn) {
 
 			if len(results) > 0 {
 				for _, result := range results {
+					fmt.Println("\n Sending result: ", string(result))
 					c.Write(result)
 					c.Flush()
 				}

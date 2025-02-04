@@ -42,7 +42,7 @@ func NewCommand(value resp.Value) (Command, error) {
 		return Command{
 			Type:      arr[0],
 			Args:      arr[1:],
-			Propagate: shouldPropagate(arr[0]),
+			Propagate: isPropagatedCommand(arr[0]),
 			Raw:       raw,
 		}, nil
 	}
@@ -51,18 +51,14 @@ func NewCommand(value resp.Value) (Command, error) {
 
 	return Command{
 		Type:      typ,
-		Propagate: shouldPropagate(typ),
+		Propagate: isPropagatedCommand(typ),
 		Raw:       raw,
 	}, nil
 }
 
-func shouldPropagate(c string) bool {
+func isPropagatedCommand(c string) bool {
 	s := strings.ToUpper(c)
 	return s == "SET" || s == "DEL"
-}
-
-func isPropagatedCommand(c string) bool {
-	return shouldPropagate(c)
 }
 
 func (c *Command) Execute(handler commandRouter, s RequestContext) ([][]byte, error) {

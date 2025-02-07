@@ -7,7 +7,9 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/config"
 	"io"
 	"net"
+	"strconv"
 	"strings"
+	"time"
 )
 
 type MasterServer struct {
@@ -25,8 +27,8 @@ func (m *MasterServer) Stop() {
 
 func (m *MasterServer) handleConnection(conn net.Conn) {
 	var (
-		content bytes.Buffer
-		//isReplicaConnection bool
+		content             bytes.Buffer
+		isReplicaConnection bool
 	)
 
 	for {
@@ -44,34 +46,45 @@ func (m *MasterServer) handleConnection(conn net.Conn) {
 		content.Write(buf[:n])
 
 		// Process the command
-		results, com, _, execErr := m.ExecuteCommand(&content, &conn)
+		results, coms, _, execErr := m.ExecuteCommands(&content, &conn)
 
 		if execErr != nil {
 			fmt.Println("Error executing command: ", execErr)
 			continue
 		}
 
-		if strings.ToUpper(com.Type) == "PSYNC" {
-			//isReplicaConnection = true
-		}
-
 		c := bufio.NewWriter(conn)
-		for _, result := range results {
-			fmt.Println("\n Sending result: ", string(result))
-			c.Write(result)
+		if len(results) > 1 {
+			for _, result := range results {
+				fmt.Println("Sending result: ", strconv.Quote(string(result)))
+				c.Write(result)
+				c.Flush()
+				time.Sleep(100 * time.Millisecond)
+			}
+		} else {
+			fmt.Println("Sending result: ", strconv.Quote(string(results[0])))
+			c.Write(results[0])
 			c.Flush()
 		}
 
-		if com.Propagatable {
-			fmt.Println("Propagating command to replicas ", com.String())
-			m.CommandsChannel <- com.Raw
+		for _, com := range coms {
+			typ := strings.ToUpper(com.Type)
+			if typ == "SET" || typ == "DEL" {
+				fmt.Println("Propagating command to replicas ", com.String())
+				m.CommandsChannel <- com.Raw
+			}
+
+			if strings.ToUpper(com.Type) == "PSYNC" {
+				isReplicaConnection = true
+			}
 		}
+
 		content.Reset()
 
 		// If it's a replica connection, exit the loop
-		//if isReplicaConnection {
-		//	break
-		//}
+		if isReplicaConnection {
+			break
+		}
 	}
 }
 

@@ -9,7 +9,6 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/config"
 	"io"
 	"net"
-	"os"
 	"strconv"
 	"strings"
 )
@@ -48,9 +47,8 @@ func (ss *SlaveServer) handleConnection(conn net.Conn) {
 		}
 
 		content.Write(buf[:n])
-		fmt.Printf("[%s] Received data: - %s \n", strings.ToUpper(string(ss.Info.Role)), string(buf))
 
-		results, comm, _, execErr := ss.ExecuteCommand(&content, &conn)
+		results, _, _, execErr := ss.ExecuteCommands(&content, &conn)
 
 		if execErr != nil {
 			fmt.Println("Error executing command: ", execErr)
@@ -58,10 +56,10 @@ func (ss *SlaveServer) handleConnection(conn net.Conn) {
 		}
 
 		// we should not respond to a propagated command.  rename this field to better communicate intent
-		if !comm.Propagatable {
+		if len(results) > 0 {
 			c := bufio.NewWriter(conn)
 			for _, result := range results {
-				fmt.Println("\n Sending result: ", string(result))
+				fmt.Println("\n Sending result: ", strconv.Quote(string(result)))
 				c.Write(result)
 				c.Flush()
 			}
@@ -73,25 +71,31 @@ func (ss *SlaveServer) handleConnection(conn net.Conn) {
 
 func (ss *SlaveServer) connectToMaster() {
 	s := strings.Split(*config.Config.ReplicaOf, " ")
-	fmt.Println("Connecting to master: ", s[0], ":", s[1])
 	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%s", s[0], s[1]))
+	fmt.Println("Initializing Handshake: ", conn.RemoteAddr())
 
 	if err != nil {
 		panic(connectionError)
 	}
 
 	c := bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn))
+	reader := resp.NewReader(c)
+	ss.Ping(c, reader)
+	ss.ReplConf(c, reader, "listening-port", strconv.Itoa(*config.Config.Port))
+	ss.ReplConf(c, reader, "capa", "psync2")
+	ss.Psync(c, reader)
 
-	ss.Ping(c)
-	ss.ReplConf(c, "listening-port", strconv.Itoa(*config.Config.Port))
-	ss.ReplConf(c, "capa", "psync2")
-	ss.Psync(c, "?", "-1")
+	err = ignoreRDB(c)
 
-	ignoreRDB(c)
-	ss.Connections <- conn
+	if err != nil {
+		fmt.Println("Error ignoring RDB file: ", err)
+		return
+	}
+
+	go ss.handleConnection(conn)
 }
 
-func (ss *SlaveServer) ReplConf(conn *bufio.ReadWriter, params ...string) {
+func (ss *SlaveServer) ReplConf(conn *bufio.ReadWriter, reader *resp.Reader, params ...string) {
 	args := make([]resp.Value, 0, len(params)+1)
 	args = append(args, resp.BulkStringValue("REPLCONF"))
 
@@ -99,39 +103,38 @@ func (ss *SlaveServer) ReplConf(conn *bufio.ReadWriter, params ...string) {
 		args = append(args, resp.BulkStringValue(p))
 	}
 
-	repleConf := resp.ArrayValue(
+	c := resp.ArrayValue(
 		args...,
 	)
 
-	response, _ := repleConf.Marshal()
+	response, _ := c.Marshal()
 	_, err := conn.Write(response)
 	conn.Flush()
 
-	r, _, err := resp.NewReader(conn).ReadSimpleValue(resp.SimpleString)
+	r, _, err := reader.ReadValue()
 
 	if err != nil {
 		panic(err)
 	}
 
-	v, err := r.Marshal()
-	fmt.Println("REPLCONF response: ", string(v))
+	fmt.Println("REPLCONF response: ", r.String())
 
 	if r.String() != "OK" {
-		fmt.Println("Ping failed - invalid response")
+		fmt.Println("repl conf failed - invalid response")
 	}
 }
 
-func (ss *SlaveServer) Psync(conn *bufio.ReadWriter, replid, offset string) {
-	psync := resp.ArrayValue(
+func (ss *SlaveServer) Psync(conn *bufio.ReadWriter, reader *resp.Reader) {
+	p := resp.ArrayValue(
 		resp.BulkStringValue("PSYNC"),
-		resp.BulkStringValue(replid),
-		resp.BulkStringValue(offset),
+		resp.BulkStringValue("?"),
+		resp.BulkStringValue("-1"),
 	)
-	response, _ := psync.Marshal()
+	response, _ := p.Marshal()
 	conn.Write(response)
 	conn.Flush()
 
-	r, _, err := resp.NewReader(conn).ReadSimpleValue(resp.SimpleString)
+	r, _, err := reader.ReadValue()
 
 	if err != nil {
 		panic(err)
@@ -140,7 +143,7 @@ func (ss *SlaveServer) Psync(conn *bufio.ReadWriter, replid, offset string) {
 	fmt.Println("PSYNC response: ", r.String())
 }
 
-func (ss *SlaveServer) Ping(conn *bufio.ReadWriter) {
+func (ss *SlaveServer) Ping(conn *bufio.ReadWriter, reader *resp.Reader) {
 	ping := resp.ArrayValue(
 		resp.BulkStringValue("PING"),
 	)
@@ -148,43 +151,55 @@ func (ss *SlaveServer) Ping(conn *bufio.ReadWriter) {
 	conn.Write(s)
 	conn.Flush()
 
-	r, _, err := resp.NewReader(conn).ReadSimpleValue(resp.SimpleString)
+	r, _, err := reader.ReadValue()
 
 	if err != nil {
 		panic(err)
 	}
 
-	fmt.Println("Ping response: ", string(r.Raw))
+	fmt.Println("Ping response: ", r.String())
 
-	if r.String() != "+PONG" {
+	if r.String() != "PONG" {
 		fmt.Println("Ping failed - invalid response")
 	}
 }
 
 func ignoreRDB(reader *bufio.ReadWriter) error {
-	firstLine, err := reader.ReadString('\n')
-	if err != nil {
-		return fmt.Errorf("failed to read RDB length: %v", err)
+	for {
+		n, err := reader.Peek(1)
+
+		if err != nil {
+			return fmt.Errorf("failed to peek RDB length: %v", err)
+		}
+
+		if string(n[0]) != "$" {
+			continue
+		}
+
+		fmt.Println("Reading RDB file length ", n)
+		reader.Discard(1) // discard the bulk prefix
+
+		l, err := reader.ReadString('\n')
+
+		if err != nil {
+			return fmt.Errorf("failed to read RDB length: %v", err)
+		}
+
+		length, err := strconv.Atoi(strings.TrimSpace(l))
+
+		if err != nil {
+			return fmt.Errorf("invalid RDB length: %v", err)
+		}
+
+		fmt.Println("RDB file length: ", length)
+
+		_, err = io.CopyN(io.Discard, reader, int64(length))
+
+		if err != nil {
+			return fmt.Errorf("failed to skip RDB file: %v", err)
+		}
+
+		fmt.Println("RDB file ignored successfully")
+		return nil
 	}
-
-	if !strings.HasPrefix(firstLine, "$") {
-		return fmt.Errorf("unexpected response, not a bulk RDB file: %s", firstLine)
-	}
-
-	length, err := strconv.Atoi(strings.TrimPrefix(strings.TrimSpace(firstLine), "$"))
-
-	if err != nil {
-		return fmt.Errorf("invalid RDB length: %v", err)
-	}
-
-	fmt.Printf("RDB file length: %d\n", length)
-
-	_, err = io.CopyN(os.Stdout, reader, int64(length))
-
-	if err != nil {
-		return fmt.Errorf("failed to skip RDB file: %v", err)
-	}
-
-	fmt.Println("RDB file ignored successfully")
-	return nil
 }

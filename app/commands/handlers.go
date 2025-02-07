@@ -157,14 +157,14 @@ func pSyncHandler(c Command, s RequestContext) (resp.Value, error) {
 	s.Info.AddReplica(s.Conn)
 
 	return resp.FlatArrayValue(
-		resp.BulkStringValue(
+		resp.StringValue(
 			fmt.Sprintf(
 				"FULLRESYNC %s %v",
 				s.Info.MasterReplid,
 				s.Info.MasterReplOffset,
 			),
 		),
-		resp.Value{Type: resp.BulkString, Raw: s.Store.Dump(), BulkLike: true},
+		resp.BulkLikeStringValue(s.Store.Dump()),
 	), nil
 }
 

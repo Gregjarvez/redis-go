@@ -88,11 +88,11 @@ func (s *BaseServer) handleConnections(handleConnection func(conn net.Conn)) {
 	}
 }
 
-func (s *BaseServer) ExecuteCommand(r io.Reader, conn *net.Conn) ([][]byte, *commands.Command, int, error) {
+func (s *BaseServer) ExecuteCommands(r io.Reader, conn *net.Conn) ([][]byte, []commands.Command, int, error) {
 	var (
 		results [][]byte
 		n       int
-		com     commands.Command
+		coms    []commands.Command
 		err     error
 	)
 
@@ -117,7 +117,7 @@ func (s *BaseServer) ExecuteCommand(r io.Reader, conn *net.Conn) ([][]byte, *com
 
 		fmt.Printf("[%s] Processed - %s \n", strings.ToUpper(string(s.Info.Role)), com.String())
 
-		results, err = com.Execute(commands.DefaultHandlers, commands.RequestContext{
+		rs, err := com.Execute(commands.DefaultHandlers, commands.RequestContext{
 			Store: s.Datastore,
 			Info:  &s.Info,
 			Conn:  conn,
@@ -127,7 +127,10 @@ func (s *BaseServer) ExecuteCommand(r io.Reader, conn *net.Conn) ([][]byte, *com
 			fmt.Println("Failed to execute command: ", err)
 			return nil, nil, n, err
 		}
+
+		results = append(results, rs...)
+		coms = append(coms, com)
 	}
 
-	return results, &com, n, err
+	return results, coms, n, err
 }

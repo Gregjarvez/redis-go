@@ -43,6 +43,14 @@ func StringValue(s string) Value {
 	}
 }
 
+func BulkLikeStringValue(s []byte) Value {
+	return Value{
+		Type:     BulkString,
+		Raw:      s,
+		BulkLike: true,
+	}
+}
+
 func BulkStringValue(s string, isNil ...bool) Value {
 	return Value{
 		Type:  BulkString,
@@ -100,12 +108,10 @@ func (t DataType) String() string {
 
 func (v *Value) String() string {
 	switch v.Type {
-	case SimpleString, SimpleError, Integer:
-		return string(v.Raw)
 	case Array:
 		return fmt.Sprintf("%v", v.Values)
 	default:
-		return fmt.Sprintf("%v", v.Raw)
+		return string(v.Raw)
 	}
 }
 

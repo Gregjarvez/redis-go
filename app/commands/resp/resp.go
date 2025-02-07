@@ -123,6 +123,7 @@ func (r *Reader) ReadArrayValue() (Value, int, error) {
 	length, err := r.readInt()
 
 	if err != nil {
+		fmt.Println(err)
 		return nullValue, 0, errors.New("invalid array")
 	}
 

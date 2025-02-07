@@ -19,7 +19,7 @@ type Command struct {
 
 type RequestContext struct {
 	Store store.DataStore
-	Info  config.Info
+	Info  *config.Info
 	Conn  *net.Conn
 }
 

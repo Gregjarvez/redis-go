@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bufio"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
@@ -99,10 +100,11 @@ func (i *Info) AddReplica(conn *net.Conn) {
 		conn := *r.Conn
 
 		defer i.RemoveReplica(key)
-		defer conn.Close()
-
+		writer := bufio.NewWriter(conn)
 		for cmd := range r.Queue {
-			_, err := conn.Write(cmd)
+			_, err := writer.Write(cmd)
+			writer.Flush()
+
 			if err != nil {
 				if err == io.EOF {
 					fmt.Println("Replica disconnected:", conn.RemoteAddr())

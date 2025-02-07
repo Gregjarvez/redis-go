@@ -2,49 +2,96 @@ package tcp
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"github.com/codecrafters-io/redis-starter-go/app/commands/resp"
 	"github.com/codecrafters-io/redis-starter-go/app/config"
 	"io"
 	"net"
+	"os"
 	"strconv"
 	"strings"
-	"time"
 )
+
+var connectionError = errors.New("error connecting to master")
 
 type SlaveServer struct {
 	*BaseServer
 }
 
-func (m *SlaveServer) Start() {
-	m.StartListener()
-	m.connectToMaster()
+func (ss *SlaveServer) Start() {
+	ss.StartListener(ss.handleConnection)
+	ss.connectToMaster()
 }
 
-func (m *SlaveServer) Stop() {
-	m.StopListener()
+func (ss *SlaveServer) Stop() {
+	ss.StopListener()
 }
 
-var connectionError = errors.New("error connecting to master")
+func (ss *SlaveServer) handleConnection(conn net.Conn) {
+	fmt.Println("Slave - New connection from: ", conn.RemoteAddr())
+	var (
+		content bytes.Buffer
+		buf     = make([]byte, 1024)
+	)
 
-func (m *SlaveServer) connectToMaster() {
+	for {
+		n, err := conn.Read(buf)
+		if err != nil {
+			if err == io.EOF {
+				fmt.Println("Client disconnected")
+				break
+			}
+			fmt.Println("Read error:", err)
+			return
+		}
+
+		content.Write(buf[:n])
+		fmt.Printf("[%s] Received data: - %s \n", strings.ToUpper(string(ss.Info.Role)), string(buf))
+
+		results, comm, processed, execErr := ss.ExecuteCommand(&content, &conn)
+
+		if execErr != nil {
+			conn.Write([]byte(fmt.Sprintf("-ERR %v\r\n", execErr.Error()))) // nolint:errcheck
+			break
+		}
+
+		// we should not respond to a propagated command.  rename this field to better communicate intent
+		if !comm.Propagate {
+			c := bufio.NewWriter(conn)
+			for _, result := range results {
+				fmt.Println("\n Sending result: ", string(result))
+				c.Write(result)
+				c.Flush()
+			}
+		}
+
+		content.Next(processed)
+	}
+}
+
+func (ss *SlaveServer) connectToMaster() {
 	s := strings.Split(*config.Config.ReplicaOf, " ")
-	conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%s", s[0], s[1]), 5*time.Second)
+	fmt.Println("Connecting to master: ", s[0], ":", s[1])
+	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%s", s[0], s[1]))
 
 	if err != nil {
 		panic(connectionError)
 	}
 
-	ping(conn)
-	replConf(conn, "listening-port", strconv.Itoa(*config.Config.Port))
-	replConf(conn, "capa", "eof", "capa", "psync2")
-	psync(conn, "?", "-1")
+	c := bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn))
 
-	m.handleConnection(conn)
+	ss.Ping(c)
+	ss.ReplConf(c, "listening-port", strconv.Itoa(*config.Config.Port))
+	ss.ReplConf(c, "capa", "psync2")
+	ss.Psync(c, "?", "-1")
+
+	ignoreRDB(c)
+	ss.Connections <- conn
 }
 
-func replConf(conn net.Conn, params ...string) {
+func (ss *SlaveServer) ReplConf(conn *bufio.ReadWriter, params ...string) {
 	args := make([]resp.Value, 0, len(params)+1)
 	args = append(args, resp.BulkStringValue("REPLCONF"))
 
@@ -52,14 +99,13 @@ func replConf(conn net.Conn, params ...string) {
 		args = append(args, resp.BulkStringValue(p))
 	}
 
-	writer := bufio.NewWriter(conn)
 	repleConf := resp.ArrayValue(
 		args...,
 	)
 
 	response, _ := repleConf.Marshal()
-	_, err := writer.Write(response)
-	writer.Flush()
+	_, err := conn.Write(response)
+	conn.Flush()
 
 	r, _, err := resp.NewReader(conn).ReadSimpleValue(resp.SimpleString)
 
@@ -74,16 +120,15 @@ func replConf(conn net.Conn, params ...string) {
 	}
 }
 
-func psync(conn net.Conn, replid, offset string) {
-	writer := bufio.NewWriter(conn)
+func (ss *SlaveServer) Psync(conn *bufio.ReadWriter, replid, offset string) {
 	psync := resp.ArrayValue(
 		resp.BulkStringValue("PSYNC"),
 		resp.BulkStringValue(replid),
 		resp.BulkStringValue(offset),
 	)
 	response, _ := psync.Marshal()
-	writer.Write(response)
-	writer.Flush()
+	conn.Write(response)
+	conn.Flush()
 
 	r, _, err := resp.NewReader(conn).ReadSimpleValue(resp.SimpleString)
 
@@ -92,18 +137,15 @@ func psync(conn net.Conn, replid, offset string) {
 	}
 
 	fmt.Println("PSYNC response: ", r.String())
-
-	ignoreRDB(conn)
 }
 
-func ping(conn net.Conn) {
-	writer := bufio.NewWriter(conn)
+func (ss *SlaveServer) Ping(conn *bufio.ReadWriter) {
 	ping := resp.ArrayValue(
 		resp.BulkStringValue("PING"),
 	)
 	response, _ := ping.Marshal()
-	writer.Write(response)
-	writer.Flush()
+	conn.Write(response)
+	conn.Flush()
 
 	r, _, err := resp.NewReader(conn).ReadSimpleValue(resp.SimpleString)
 
@@ -118,9 +160,7 @@ func ping(conn net.Conn) {
 	}
 }
 
-func ignoreRDB(conn net.Conn) error {
-	reader := bufio.NewReader(conn)
-
+func ignoreRDB(reader *bufio.ReadWriter) error {
 	firstLine, err := reader.ReadString('\n')
 	if err != nil {
 		return fmt.Errorf("failed to read RDB length: %v", err)
@@ -138,15 +178,10 @@ func ignoreRDB(conn net.Conn) error {
 
 	fmt.Printf("RDB file length: %d\n", length)
 
-	_, err = io.CopyN(io.Discard, reader, int64(length))
+	_, err = io.CopyN(os.Stdout, reader, int64(length))
+
 	if err != nil {
 		return fmt.Errorf("failed to skip RDB file: %v", err)
-	}
-
-	// Read the final \r\n after the bulk string
-	_, err = reader.ReadString('\n')
-	if err != nil {
-		return fmt.Errorf("failed to consume final line after RDB: %v", err)
 	}
 
 	fmt.Println("RDB file ignored successfully")

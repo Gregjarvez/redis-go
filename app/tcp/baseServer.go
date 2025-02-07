@@ -96,8 +96,9 @@ func (s *BaseServer) ExecuteCommand(r io.Reader, conn *net.Conn) ([][]byte, *com
 		err     error
 	)
 
+	reader := resp.NewReader(r)
 	for {
-		value, n, err := resp.NewReader(r).ReadValue()
+		value, n, err := reader.ReadValue()
 
 		if err != nil {
 			if err == io.EOF {

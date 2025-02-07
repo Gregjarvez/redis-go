@@ -18,6 +18,11 @@ type Server interface {
 	Stop()
 }
 
+type ExecutionResult struct {
+	Results [][]byte
+	Command *commands.Command
+}
+
 type BaseServer struct {
 	ListAddr  string
 	Listener  net.Listener
@@ -88,31 +93,28 @@ func (s *BaseServer) handleConnections(handleConnection func(conn net.Conn)) {
 	}
 }
 
-func (s *BaseServer) ExecuteCommands(r io.Reader, conn *net.Conn) ([][]byte, []commands.Command, int, error) {
+func (s *BaseServer) ExecuteCommands(r io.Reader, conn *net.Conn) ([]ExecutionResult, error) {
 	var (
-		results [][]byte
-		n       int
-		coms    []commands.Command
-		err     error
+		results []ExecutionResult
 	)
 
 	reader := resp.NewReader(r)
 	for {
-		value, n, err := reader.ReadValue()
+		value, _, err := reader.ReadValue()
 
 		if err != nil {
 			if err == io.EOF {
 				break
 			}
 			fmt.Println("Failed to read value: ", err)
-			return nil, nil, n, err
+			return nil, err
 		}
 
 		com, err := commands.NewCommand(value)
 
 		if err != nil {
 			fmt.Println("Failed to create command: ", err)
-			return nil, nil, 0, err
+			return nil, err
 		}
 
 		fmt.Printf("[%s] Processed - %s \n", strings.ToUpper(string(s.Info.Role)), com.String())
@@ -125,12 +127,14 @@ func (s *BaseServer) ExecuteCommands(r io.Reader, conn *net.Conn) ([][]byte, []c
 
 		if err != nil {
 			fmt.Println("Failed to execute command: ", err)
-			return nil, nil, n, err
+			return nil, err
 		}
 
-		results = append(results, rs...)
-		coms = append(coms, com)
+		results = append(results, ExecutionResult{
+			Results: rs,
+			Command: &com,
+		})
 	}
 
-	return results, coms, n, err
+	return results, nil
 }

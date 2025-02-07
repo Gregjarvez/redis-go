@@ -70,11 +70,6 @@ func (c *Command) Execute(handler commandRouter, s RequestContext) ([][]byte, er
 
 	var responses [][]byte
 
-	// slave server should not respond to propagated commands SET and DEL
-	if !s.Info.IsMaster() && isPropagatedCommand(c.Type) {
-		return responses, nil
-	}
-
 	if res.Type == resp.Array && res.Flatten {
 		for _, v := range res.Values {
 			r, err := v.Marshal()

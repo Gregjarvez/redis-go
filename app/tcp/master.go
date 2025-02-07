@@ -46,7 +46,7 @@ func (m *MasterServer) handleConnection(conn net.Conn) {
 		content.Write(buf[:n])
 
 		// Process the command
-		results, coms, _, execErr := m.ExecuteCommands(&content, &conn)
+		results, execErr := m.ExecuteCommands(&content, &conn)
 
 		if execErr != nil {
 			fmt.Println("Error executing command: ", execErr)
@@ -54,28 +54,25 @@ func (m *MasterServer) handleConnection(conn net.Conn) {
 		}
 
 		c := bufio.NewWriter(conn)
-		if len(results) > 1 {
-			for _, result := range results {
-				fmt.Println("Sending result: ", strconv.Quote(string(result)))
-				c.Write(result)
-				c.Flush()
-				time.Sleep(100 * time.Millisecond)
-			}
-		} else {
-			fmt.Println("Sending result: ", strconv.Quote(string(results[0])))
-			c.Write(results[0])
-			c.Flush()
-		}
 
-		for _, com := range coms {
-			typ := strings.ToUpper(com.Type)
-			if typ == "SET" || typ == "DEL" {
-				fmt.Println("Propagating command to replicas ", com.String())
-				m.CommandsChannel <- com.Raw
-			}
+		for _, exec := range results {
+			result := exec.Results
+			com := exec.Command
 
 			if strings.ToUpper(com.Type) == "PSYNC" {
 				isReplicaConnection = true
+			}
+
+			for _, r := range result {
+				fmt.Println("Sending result: ", strconv.Quote(string(r)))
+				c.Write(r)
+				c.Flush()
+				time.Sleep(100 * time.Millisecond)
+			}
+
+			if com.Propagate {
+				fmt.Println("Propagating command to replicas ", com.String())
+				m.CommandsChannel <- com.Raw
 			}
 		}
 

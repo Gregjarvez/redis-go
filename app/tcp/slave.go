@@ -5,15 +5,23 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/codecrafters-io/redis-starter-go/app/commands"
 	"github.com/codecrafters-io/redis-starter-go/app/commands/resp"
 	"github.com/codecrafters-io/redis-starter-go/app/config"
 	"io"
 	"net"
+	"slices"
 	"strconv"
 	"strings"
 )
 
 var connectionError = errors.New("error connecting to master")
+
+var RespondToCommand = []string{
+	"SET",
+	"DEL",
+	"REPLCONF",
+}
 
 type SlaveServer struct {
 	*BaseServer
@@ -48,20 +56,24 @@ func (ss *SlaveServer) handleConnection(conn net.Conn) {
 
 		content.Write(buf[:n])
 
-		results, _, _, execErr := ss.ExecuteCommands(&content, &conn)
+		results, err := ss.ExecuteCommands(&content, &conn)
 
-		if execErr != nil {
-			fmt.Println("Error executing command: ", execErr)
+		if err != nil {
+			fmt.Println("Error executing command: ", err)
 			break
 		}
 
-		// we should not respond to a propagated command.  rename this field to better communicate intent
-		if len(results) > 0 {
-			c := bufio.NewWriter(conn)
-			for _, result := range results {
-				fmt.Println("\n Sending result: ", strconv.Quote(string(result)))
-				c.Write(result)
-				c.Flush()
+		c := bufio.NewWriter(conn)
+		for _, exec := range results {
+			result := exec.Results
+			com := exec.Command
+
+			if ss.ShouldRespondToCommand(com) {
+				for _, r := range result {
+					fmt.Println("Sending result: ", strconv.Quote(string(r)))
+					c.Write(r)
+					c.Flush()
+				}
 			}
 		}
 
@@ -202,4 +214,8 @@ func ignoreRDB(reader *bufio.ReadWriter) error {
 		fmt.Println("RDB file ignored successfully")
 		return nil
 	}
+}
+
+func (s *SlaveServer) ShouldRespondToCommand(c *commands.Command) bool {
+	return !slices.Contains(RespondToCommand, strings.ToUpper(c.Type))
 }

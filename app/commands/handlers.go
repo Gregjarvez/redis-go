@@ -150,7 +150,16 @@ func infoHandler(c Command, context RequestContext) (resp.Value, error) {
 }
 
 func replConfigHandler(c Command, _ RequestContext) (resp.Value, error) {
-	return resp.BulkStringValue("OK"), nil
+	switch strings.ToUpper(c.Args[0]) {
+	case "GETACK":
+		return resp.ArrayValue(
+			resp.BulkStringValue("REPLCONF"),
+			resp.BulkStringValue("ACK"),
+			resp.BulkStringValue("0"),
+		), nil
+	default:
+		return resp.BulkStringValue("OK"), nil
+	}
 }
 
 func pSyncHandler(c Command, s RequestContext) (resp.Value, error) {
@@ -169,8 +178,8 @@ func pSyncHandler(c Command, s RequestContext) (resp.Value, error) {
 }
 
 func docHandler(c Command, s RequestContext) (resp.Value, error) {
-	switch strings.ToLower(c.Args[0]) {
-	case "docs":
+	switch strings.ToUpper(c.Args[0]) {
+	case "DOCS":
 		return resp.BulkStringValue("Welcome"), nil
 	default:
 		return resp.BulkStringValue("Welcome"), nil

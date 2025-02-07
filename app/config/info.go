@@ -82,6 +82,10 @@ func (i *Info) IsMaster() bool {
 	return i.Role == Master
 }
 
+func (i *Info) IsSlave() bool {
+	return i.Role == Slave
+}
+
 func (i *Info) AddReplica(conn *net.Conn) {
 	if !i.IsMaster() {
 		fmt.Println("Not a master, cannot add replica")

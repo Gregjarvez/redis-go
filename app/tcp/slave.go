@@ -20,7 +20,6 @@ var connectionError = errors.New("error connecting to master")
 var RespondToCommand = []string{
 	"SET",
 	"DEL",
-	"REPLCONF",
 }
 
 type SlaveServer struct {

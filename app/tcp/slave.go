@@ -13,11 +13,12 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 )
 
 var connectionError = errors.New("error connecting to master")
 
-var RespondToCommand = []string{
+var PropagatedCommand = []string{
 	"SET",
 	"DEL",
 }
@@ -28,7 +29,7 @@ type SlaveServer struct {
 
 func (ss *SlaveServer) Start() {
 	ss.StartListener(ss.handleConnection)
-	go ss.connectToMaster()
+	ss.connectToMaster()
 }
 
 func (ss *SlaveServer) Stop() {
@@ -67,11 +68,12 @@ func (ss *SlaveServer) handleConnection(conn net.Conn) {
 			result := exec.Results
 			com := exec.Command
 
-			if ss.ShouldRespondToCommand(com) {
+			if shouldRespondToCommand(com) {
 				for _, r := range result {
 					fmt.Println("Sending result: ", strconv.Quote(string(r)))
 					c.Write(r)
 					c.Flush()
+					time.Sleep(100 * time.Millisecond)
 				}
 			}
 		}
@@ -96,13 +98,14 @@ func (ss *SlaveServer) connectToMaster() {
 	ss.ReplConf(c, reader, "capa", "psync2")
 	ss.Psync(c, reader)
 
-	err = ignoreRDB(c)
+	file, err := getRDBContent(c)
 
 	if err != nil {
 		fmt.Println("Error ignoring RDB file: ", err)
 		return
 	}
 
+	ss.Datastore.Hydrate(bytes.NewReader(file))
 	go ss.handleConnection(conn)
 }
 
@@ -175,12 +178,12 @@ func (ss *SlaveServer) Ping(conn *bufio.ReadWriter, reader *resp.Reader) {
 	}
 }
 
-func ignoreRDB(reader *bufio.ReadWriter) error {
+func getRDBContent(reader *bufio.ReadWriter) ([]byte, error) {
 	for {
 		n, err := reader.Peek(1)
 
 		if err != nil {
-			return fmt.Errorf("failed to peek RDB length: %v", err)
+			return nil, fmt.Errorf("failed to peek RDB length: %v", err)
 		}
 
 		if string(n[0]) != "$" {
@@ -193,28 +196,27 @@ func ignoreRDB(reader *bufio.ReadWriter) error {
 		l, err := reader.ReadString('\n')
 
 		if err != nil {
-			return fmt.Errorf("failed to read RDB length: %v", err)
+			return nil, fmt.Errorf("failed to read RDB length: %v", err)
 		}
 
 		length, err := strconv.Atoi(strings.TrimSpace(l))
 
 		if err != nil {
-			return fmt.Errorf("invalid RDB length: %v", err)
+			return nil, fmt.Errorf("invalid RDB length: %v", err)
 		}
 
 		fmt.Println("RDB file length: ", length)
-
-		_, err = io.CopyN(io.Discard, reader, int64(length))
+		buf := make([]byte, length)
+		_, err = reader.Read(buf)
 
 		if err != nil {
-			return fmt.Errorf("failed to skip RDB file: %v", err)
+			return nil, fmt.Errorf("failed to skip RDB file: %v", err)
 		}
 
-		fmt.Println("RDB file ignored successfully")
-		return nil
+		return buf, nil
 	}
 }
 
-func (s *SlaveServer) ShouldRespondToCommand(c *commands.Command) bool {
-	return !slices.Contains(RespondToCommand, strings.ToUpper(c.Type))
+func shouldRespondToCommand(c *commands.Command) bool {
+	return !slices.Contains(PropagatedCommand, strings.ToUpper(c.Type))
 }

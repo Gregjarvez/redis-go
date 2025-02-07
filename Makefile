@@ -1,7 +1,7 @@
 submit:
 	codecrafters submit
 test:
-	codecrafter test
+	codecrafters test
 test-local:
 	go test ./...
 run:

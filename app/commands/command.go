@@ -11,10 +11,10 @@ import (
 )
 
 type Command struct {
-	Type      string
-	Args      []string
-	Propagate bool
-	Raw       []byte
+	Type         string
+	Args         []string
+	Propagatable bool
+	Raw          []byte
 }
 
 type RequestContext struct {
@@ -40,19 +40,19 @@ func NewCommand(value resp.Value) (Command, error) {
 		}
 
 		return Command{
-			Type:      arr[0],
-			Args:      arr[1:],
-			Propagate: isPropagatedCommand(arr[0]),
-			Raw:       raw,
+			Type:         arr[0],
+			Args:         arr[1:],
+			Propagatable: isPropagatedCommand(arr[0]),
+			Raw:          raw,
 		}, nil
 	}
 
 	typ, _ := value.AsString()
 
 	return Command{
-		Type:      typ,
-		Propagate: isPropagatedCommand(typ),
-		Raw:       raw,
+		Type:         typ,
+		Propagatable: isPropagatedCommand(typ),
+		Raw:          raw,
 	}, nil
 }
 

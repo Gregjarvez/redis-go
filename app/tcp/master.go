@@ -25,12 +25,12 @@ func (m *MasterServer) Stop() {
 
 func (m *MasterServer) handleConnection(conn net.Conn) {
 	var (
-		content             bytes.Buffer
-		buf                 = make([]byte, 1024)
-		isReplicaConnection bool
+		content bytes.Buffer
+		//isReplicaConnection bool
 	)
 
 	for {
+		buf := make([]byte, 1024)
 		n, err := conn.Read(buf)
 		if err != nil {
 			if err == io.EOF {
@@ -41,28 +41,18 @@ func (m *MasterServer) handleConnection(conn net.Conn) {
 			return
 		}
 
-		fmt.Printf("[%s] Received data: - %s \n", strings.ToUpper(string(m.Info.Role)), content.String())
 		content.Write(buf[:n])
 
 		// Process the command
-		results, com, processed, execErr := m.ExecuteCommand(&content, &conn)
-
-		if processed == 0 {
-			break
-		}
+		results, com, _, execErr := m.ExecuteCommand(&content, &conn)
 
 		if execErr != nil {
-			conn.Write([]byte(fmt.Sprintf("-ERR %v\r\n", execErr.Error()))) // nolint:errcheck
+			fmt.Println("Error executing command: ", execErr)
 			continue
 		}
 
 		if strings.ToUpper(com.Type) == "PSYNC" {
-			isReplicaConnection = true
-		}
-
-		if com.Propagate {
-			fmt.Println("Propagating command to replicas ", com.String())
-			m.CommandsChannel <- com.Raw
+			//isReplicaConnection = true
 		}
 
 		c := bufio.NewWriter(conn)
@@ -72,12 +62,16 @@ func (m *MasterServer) handleConnection(conn net.Conn) {
 			c.Flush()
 		}
 
-		content.Next(processed)
+		if com.Propagatable {
+			fmt.Println("Propagating command to replicas ", com.String())
+			m.CommandsChannel <- com.Raw
+		}
+		content.Reset()
 
 		// If it's a replica connection, exit the loop
-		if isReplicaConnection {
-			break
-		}
+		//if isReplicaConnection {
+		//	break
+		//}
 	}
 }
 

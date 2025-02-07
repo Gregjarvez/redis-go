@@ -99,8 +99,6 @@ func (s *BaseServer) ExecuteCommand(r io.Reader, conn *net.Conn) ([][]byte, *com
 	for {
 		value, n, err := resp.NewReader(r).ReadValue()
 
-		fmt.Printf("[%s] Read count: - %v \n", strings.ToUpper(string(s.Info.Role)), n)
-
 		if err != nil {
 			if err == io.EOF {
 				break
@@ -123,6 +121,11 @@ func (s *BaseServer) ExecuteCommand(r io.Reader, conn *net.Conn) ([][]byte, *com
 			Info:  &s.Info,
 			Conn:  conn,
 		})
+
+		if err != nil {
+			fmt.Println("Failed to execute command: ", err)
+			return nil, nil, n, err
+		}
 	}
 
 	return results, &com, n, err

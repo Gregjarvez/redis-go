@@ -22,7 +22,7 @@ type SlaveServer struct {
 
 func (ss *SlaveServer) Start() {
 	ss.StartListener(ss.handleConnection)
-	ss.connectToMaster()
+	go ss.connectToMaster()
 }
 
 func (ss *SlaveServer) Stop() {
@@ -33,10 +33,10 @@ func (ss *SlaveServer) handleConnection(conn net.Conn) {
 	fmt.Println("Slave - New connection from: ", conn.RemoteAddr())
 	var (
 		content bytes.Buffer
-		buf     = make([]byte, 1024)
 	)
 
 	for {
+		buf := make([]byte, 1024)
 		n, err := conn.Read(buf)
 		if err != nil {
 			if err == io.EOF {
@@ -50,15 +50,15 @@ func (ss *SlaveServer) handleConnection(conn net.Conn) {
 		content.Write(buf[:n])
 		fmt.Printf("[%s] Received data: - %s \n", strings.ToUpper(string(ss.Info.Role)), string(buf))
 
-		results, comm, processed, execErr := ss.ExecuteCommand(&content, &conn)
+		results, comm, _, execErr := ss.ExecuteCommand(&content, &conn)
 
 		if execErr != nil {
-			conn.Write([]byte(fmt.Sprintf("-ERR %v\r\n", execErr.Error()))) // nolint:errcheck
+			fmt.Println("Error executing command: ", execErr)
 			break
 		}
 
 		// we should not respond to a propagated command.  rename this field to better communicate intent
-		if !comm.Propagate {
+		if !comm.Propagatable {
 			c := bufio.NewWriter(conn)
 			for _, result := range results {
 				fmt.Println("\n Sending result: ", string(result))
@@ -67,7 +67,7 @@ func (ss *SlaveServer) handleConnection(conn net.Conn) {
 			}
 		}
 
-		content.Next(processed)
+		content.Reset()
 	}
 }
 
@@ -113,9 +113,10 @@ func (ss *SlaveServer) ReplConf(conn *bufio.ReadWriter, params ...string) {
 		panic(err)
 	}
 
-	fmt.Println("REPLCONF response: ", r.String())
+	v, err := r.Marshal()
+	fmt.Println("REPLCONF response: ", string(v))
 
-	if r.String() != "+OK" {
+	if r.String() != "OK" {
 		fmt.Println("Ping failed - invalid response")
 	}
 }
@@ -143,8 +144,8 @@ func (ss *SlaveServer) Ping(conn *bufio.ReadWriter) {
 	ping := resp.ArrayValue(
 		resp.BulkStringValue("PING"),
 	)
-	response, _ := ping.Marshal()
-	conn.Write(response)
+	s, _ := ping.Marshal()
+	conn.Write(s)
 	conn.Flush()
 
 	r, _, err := resp.NewReader(conn).ReadSimpleValue(resp.SimpleString)
@@ -153,7 +154,7 @@ func (ss *SlaveServer) Ping(conn *bufio.ReadWriter) {
 		panic(err)
 	}
 
-	fmt.Println("Ping response: ", r.String())
+	fmt.Println("Ping response: ", string(r.Raw))
 
 	if r.String() != "+PONG" {
 		fmt.Println("Ping failed - invalid response")

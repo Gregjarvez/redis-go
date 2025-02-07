@@ -42,6 +42,7 @@ var DefaultHandlers = commandRouter{
 		"INFO":     infoHandler,
 		"REPLCONF": replConfigHandler,
 		"PSYNC":    pSyncHandler,
+		"COMMAND":  docHandler,
 	},
 }
 
@@ -165,4 +166,13 @@ func pSyncHandler(c Command, s RequestContext) (resp.Value, error) {
 		),
 		resp.Value{Type: resp.BulkString, Raw: s.Store.Dump(), BulkLike: true},
 	), nil
+}
+
+func docHandler(c Command, s RequestContext) (resp.Value, error) {
+	switch strings.ToLower(c.Args[0]) {
+	case "docs":
+		return resp.BulkStringValue("Welcome"), nil
+	default:
+		return resp.BulkStringValue("Welcome"), nil
+	}
 }

@@ -142,29 +142,29 @@ func (s *BaseServer) ExecuteCommands(r io.Reader, conn *net.Conn) ([]ExecutionRe
 }
 
 func (s *BaseServer) WriteResults(w bufio.Writer, results [][]byte) error {
+	if len(results) == 0 {
+		return nil
+	}
+
 	main := results[0]
 
 	fmt.Println("Sending result: ", strconv.Quote(string(main)))
 	if _, err := w.Write(main); err != nil {
-		fmt.Println("Error writing result: ", err)
-		return err
+		return fmt.Errorf("write main result: %w", err)
 	}
-	w.Flush()
 
-	rest := results[1:]
+	if err := w.Flush(); err != nil {
+		return fmt.Errorf("flush main result: %w", err)
+	}
 
-	if len(rest) > 0 {
-		go func() {
-			time.Sleep(100 * time.Millisecond)
+	for _, r := range results[1:] {
+		if _, err := w.Write(r); err != nil {
+			return fmt.Errorf("write additional result: %w", err)
+		}
 
-			for _, r := range rest {
-				fmt.Println("Sending extra result: ", strconv.Quote(string(r)))
-				if _, err := w.Write(r); err != nil {
-					fmt.Println("Error writing extra result: ", err)
-				}
-			}
-			w.Flush()
-		}()
+		if err := w.Flush(); err != nil {
+			return fmt.Errorf("flush additional result: %w", err)
+		}
 	}
 
 	return nil

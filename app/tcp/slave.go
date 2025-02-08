@@ -113,7 +113,7 @@ func (ss *SlaveServer) connectToMaster() {
 		fmt.Println("Error hydrating datastore: ", err)
 	}
 
-	ss.handleConnection(rw)
+	ss.handleConnection(conn)
 }
 
 func (ss *SlaveServer) ReplConf(rw bufio.ReadWriter, params ...string) {

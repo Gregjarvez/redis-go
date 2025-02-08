@@ -9,6 +9,7 @@ import (
 	"net"
 	"strings"
 	"sync"
+	"sync/atomic"
 )
 
 type Role string
@@ -130,4 +131,12 @@ func (i *Info) RemoveReplica(k string) {
 	(*i.Replicas[k].Conn).Close()
 	close(i.Replicas[k].Queue)
 	delete(i.Replicas, k)
+}
+
+func (i *Info) IncrementReplOffset(offset int) {
+	atomic.AddInt64(&i.MasterReplOffset, int64(offset))
+}
+
+func (i *Info) GetReplOffset() int64 {
+	return atomic.LoadInt64(&i.MasterReplOffset)
 }

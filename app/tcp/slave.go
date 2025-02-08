@@ -70,6 +70,8 @@ func (ss *SlaveServer) handleConnection(rw io.ReadWriter) {
 			result := exec.Results
 			com := exec.Command
 
+			ss.Info.IncrementReplOffset(len(com.Raw))
+
 			if shouldRespondToCommand(com) {
 				err = ss.WriteResults(rw, result)
 

@@ -168,7 +168,7 @@ func pSyncHandler(c Command, s RequestContext) (resp.Value, error) {
 			fmt.Sprintf(
 				"FULLRESYNC %s %v",
 				s.Info.MasterReplid,
-				s.Info.MasterReplOffset,
+				s.Info.GetReplOffset(),
 			),
 		),
 		resp.BulkLikeStringValue(s.Store.Dump()),

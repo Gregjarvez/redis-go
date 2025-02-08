@@ -4,10 +4,12 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"github.com/codecrafters-io/redis-starter-go/app/commands/resp"
 	"github.com/codecrafters-io/redis-starter-go/app/config"
 	"io"
 	"net"
 	"strings"
+	"time"
 )
 
 type MasterServer struct {
@@ -77,6 +79,7 @@ func (m *MasterServer) handleConnection(conn net.Conn) {
 		content.Reset()
 		// If it's a replica connection, exit the loop
 		if isReplicaConnection {
+			//go m.Ack(conn)
 			break
 		}
 	}
@@ -115,5 +118,30 @@ func (m *MasterServer) Broadcast(command []byte) {
 			}
 
 		}(replica)
+	}
+}
+
+func (m *MasterServer) Ack(conn net.Conn) {
+	if tcpConn, ok := conn.(*net.TCPConn); ok {
+		if err := tcpConn.SetKeepAlive(true); err != nil {
+			fmt.Println("Error setting keep alive: ", err)
+		}
+
+		if err := tcpConn.SetKeepAlivePeriod(3 * time.Second); err != nil {
+			fmt.Println("Error setting keep alive period: ", err)
+		}
+	}
+
+	fmt.Println("ACK")
+	v := resp.ArrayValue(
+		resp.BulkStringValue("REPLCONF"),
+		resp.BulkStringValue("GETACK"),
+		resp.BulkStringValue("*"),
+	)
+	ack, _ := v.Marshal()
+
+	if err := m.WriteResults(*bufio.NewWriter(conn), [][]byte{ack}); err != nil {
+		fmt.Println("Error writing ack response: ", err)
+		return
 	}
 }

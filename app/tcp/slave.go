@@ -108,8 +108,6 @@ func (ss *SlaveServer) connectToMaster() {
 		fmt.Println("Error hydrating datastore: ", err)
 	}
 
-	r, err := rw.Peek(50)
-	fmt.Println("Handshake response: ", string(r))
 	ss.handleConnection(conn)
 }
 

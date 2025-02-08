@@ -158,7 +158,7 @@ func replConfigHandler(c Command, _ RequestContext) (resp.Value, error) {
 			resp.BulkStringValue("0"),
 		), nil
 	default:
-		return resp.BulkStringValue("OK"), nil
+		return resp.StringValue("OK"), nil
 	}
 }
 

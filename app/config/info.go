@@ -9,7 +9,6 @@ import (
 	"net"
 	"strings"
 	"sync"
-	"time"
 )
 
 type Role string
@@ -100,7 +99,6 @@ func (i *Info) AddReplica(conn *net.Conn) {
 	replica := &Replica{Conn: conn, Queue: make(chan []byte, 100)}
 
 	i.Replicas[key] = replica
-	keepAlive(*conn)
 
 	go func(r *Replica) {
 		conn := *r.Conn
@@ -130,19 +128,4 @@ func (i *Info) RemoveReplica(k string) {
 	(*i.Replicas[k].Conn).Close()
 	close(i.Replicas[k].Queue)
 	delete(i.Replicas, k)
-}
-
-func keepAlive(conn net.Conn) {
-	if tcpConn, ok := conn.(*net.TCPConn); ok {
-		err := tcpConn.SetKeepAlive(true)
-
-		if err != nil {
-			return
-		}
-		err = tcpConn.SetKeepAlivePeriod(30 * time.Second)
-
-		if err != nil {
-			return
-		}
-	}
 }

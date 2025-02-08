@@ -155,6 +155,7 @@ func (s *BaseServer) WriteResults(w bufio.Writer, results [][]byte) error {
 		return fmt.Errorf("write main result: %w", err)
 	}
 
+	fmt.Println("Flushing")
 	if err := w.Flush(); err != nil {
 		return fmt.Errorf("flush main result: %w", err)
 	}

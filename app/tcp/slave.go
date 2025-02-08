@@ -79,6 +79,8 @@ func (ss *SlaveServer) handleConnection(rw io.ReadWriter) {
 				}
 			}
 		}
+
+		content.Reset()
 	}
 }
 

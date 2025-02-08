@@ -17,7 +17,7 @@ type MasterServer struct {
 
 func (m *MasterServer) Start() {
 	m.StartListener(m.handleConnection)
-	go m.BroadCastCommands()
+	m.BroadCastCommands()
 }
 
 func (m *MasterServer) Stop() {
@@ -26,12 +26,14 @@ func (m *MasterServer) Stop() {
 
 func (m *MasterServer) handleConnection(rw io.ReadWriter) {
 	var (
-		content bytes.Buffer
-		//isReplicaConnection bool
+		content             bytes.Buffer
+		isReplicaConnection bool
 	)
+	var conn net.Conn
 
-	if conn, ok := rw.(*net.TCPConn); ok {
-		fmt.Println("Slave - New connection from: ", conn.RemoteAddr())
+	if connection, ok := rw.(*net.TCPConn); ok {
+		fmt.Println("Master - New connection from: ", connection.RemoteAddr())
+		conn = connection
 	}
 
 	for {
@@ -61,7 +63,8 @@ func (m *MasterServer) handleConnection(rw io.ReadWriter) {
 			com := exec.Command
 
 			if strings.ToUpper(com.Type) == "PSYNC" {
-				//isReplicaConnection = true
+				m.Info.AddReplica(&conn)
+				isReplicaConnection = true
 			}
 
 			err = m.WriteResults(rw, result)
@@ -79,15 +82,13 @@ func (m *MasterServer) handleConnection(rw io.ReadWriter) {
 
 		content.Reset()
 		// If it's a replica connection, exit the loop
-		//if isReplicaConnection {
-		//	//go m.Ack(conn)
-		//	break
-		//}
+		if isReplicaConnection {
+			break
+		}
 	}
 }
 
 func (m *MasterServer) BroadCastCommands() {
-	fmt.Println("Broadcasting commands")
 	for {
 		select {
 		case command := <-m.CommandsChannel:
@@ -114,6 +115,7 @@ func (m *MasterServer) Broadcast(command []byte) {
 
 			select {
 			case r.Queue <- command:
+				fmt.Println("Command sent to replica:", (*r.Conn).RemoteAddr())
 			default:
 				fmt.Println("Replica write queue full:", (*r.Conn).RemoteAddr())
 			}

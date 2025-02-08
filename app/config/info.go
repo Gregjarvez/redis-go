@@ -92,6 +92,8 @@ func (i *Info) AddReplica(conn *net.Conn) {
 		return
 	}
 
+	fmt.Println("Adding replica:", (*conn).RemoteAddr())
+
 	i.ReplicaMutex.Lock()
 	defer i.ReplicaMutex.Unlock()
 

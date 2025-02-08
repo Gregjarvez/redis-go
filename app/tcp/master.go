@@ -29,7 +29,6 @@ func (m *MasterServer) handleConnection(rw io.ReadWriter) {
 		content             bytes.Buffer
 		isReplicaConnection bool
 	)
-	var conn *net.TCPConn
 
 	if conn, ok := rw.(*net.TCPConn); ok {
 		fmt.Println("Slave - New connection from: ", conn.RemoteAddr())
@@ -65,7 +64,7 @@ func (m *MasterServer) handleConnection(rw io.ReadWriter) {
 				isReplicaConnection = true
 			}
 
-			err = m.WriteResults(conn, result)
+			err = m.WriteResults(rw, result)
 
 			if err != nil {
 				fmt.Println("Error writing results: ", err)

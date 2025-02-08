@@ -36,7 +36,6 @@ func (ss *SlaveServer) Stop() {
 }
 
 func (ss *SlaveServer) handleConnection(rw io.ReadWriter) {
-	var conn *net.TCPConn
 
 	if conn, ok := rw.(*net.TCPConn); ok {
 		fmt.Println("Slave - New connection from: ", conn.RemoteAddr())
@@ -73,7 +72,7 @@ func (ss *SlaveServer) handleConnection(rw io.ReadWriter) {
 			com := exec.Command
 
 			if shouldRespondToCommand(com) {
-				err = ss.WriteResults(conn, result)
+				err = ss.WriteResults(rw, result)
 
 				if err != nil {
 					fmt.Println("Error writing results: ", err)

@@ -1,6 +1,7 @@
 package tcp
 
 import (
+	"bufio"
 	"fmt"
 	"github.com/codecrafters-io/redis-starter-go/app/commands"
 	"github.com/codecrafters-io/redis-starter-go/app/commands/resp"
@@ -140,7 +141,14 @@ func (s *BaseServer) ExecuteCommands(r io.Reader) ([]ExecutionResult, error) {
 	return results, nil
 }
 
-func (s *BaseServer) WriteResults(w io.Writer, results [][]byte) error {
+func (s *BaseServer) WriteResults(writer io.Writer, results [][]byte) error {
+	var w *bufio.Writer
+	if existingWriter, ok := writer.(*bufio.Writer); !ok {
+		w = bufio.NewWriter(writer)
+	} else {
+		w = existingWriter
+	}
+
 	if len(results) == 0 {
 		return nil
 	}
@@ -153,10 +161,18 @@ func (s *BaseServer) WriteResults(w io.Writer, results [][]byte) error {
 		return fmt.Errorf("write main result: %w", err)
 	}
 
+	if err := w.Flush(); err != nil {
+		return fmt.Errorf("flush main result: %w", err)
+	}
+
 	for _, r := range results[1:] {
 		fmt.Println("Sending result remaining: ", strconv.Quote(string(r)))
 		if _, err := w.Write(r); err != nil {
 			return fmt.Errorf("write additional result: %w", err)
+		}
+
+		if err := w.Flush(); err != nil {
+			return fmt.Errorf("flush additional result: %w", err)
 		}
 		time.Sleep(10 * time.Millisecond)
 	}

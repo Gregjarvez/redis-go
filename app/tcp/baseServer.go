@@ -155,7 +155,7 @@ func (s *BaseServer) WriteResults(w bufio.Writer, results [][]byte) error {
 
 	if len(rest) > 0 {
 		go func() {
-			time.Sleep(10 * time.Millisecond)
+			time.Sleep(100 * time.Millisecond)
 
 			for _, r := range rest {
 				fmt.Println("Sending extra result: ", strconv.Quote(string(r)))

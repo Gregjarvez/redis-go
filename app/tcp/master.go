@@ -65,9 +65,17 @@ func (m *MasterServer) handleConnection(conn net.Conn) {
 
 			for _, r := range result {
 				fmt.Println("Sending result: ", strconv.Quote(string(r)))
-				c.Write(r)
-				c.Flush()
-				time.Sleep(100 * time.Millisecond)
+				_, err = c.Write(r)
+				if err != nil {
+					fmt.Println("Error writing result: ", err)
+					return
+				}
+
+				err = c.Flush()
+				if err != nil {
+					fmt.Println("Error flushing result: ", err)
+				}
+				time.Sleep(10 * time.Millisecond)
 			}
 
 			if com.Propagate {

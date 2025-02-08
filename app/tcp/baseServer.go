@@ -149,6 +149,8 @@ func (s *BaseServer) WriteResults(writer io.Writer, results [][]byte) error {
 		w = existingWriter
 	}
 
+	defer w.Flush()
+
 	if len(results) == 0 {
 		return nil
 	}

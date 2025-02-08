@@ -143,10 +143,10 @@ func (s *BaseServer) ExecuteCommands(r io.Reader) ([]ExecutionResult, error) {
 
 func (s *BaseServer) WriteResults(writer io.Writer, results [][]byte) error {
 	var w *bufio.Writer
-	if existingWriter, ok := writer.(*bufio.Writer); !ok {
-		w = bufio.NewWriter(writer)
-	} else {
+	if existingWriter, ok := writer.(*bufio.Writer); ok {
 		w = existingWriter
+	} else {
+		w = bufio.NewWriter(writer)
 	}
 
 	defer w.Flush()

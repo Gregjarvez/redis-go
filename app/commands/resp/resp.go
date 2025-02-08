@@ -17,8 +17,16 @@ var InvalidDataType = errors.New("invalid Data Type")
 
 func NewReader(input io.Reader) *Reader {
 	c := ByteCounter{size: 0}
+	var reader *bufio.Reader
+
+	if isBufioReader, ok := input.(*bufio.Reader); ok {
+		reader = isBufioReader
+	} else {
+		reader = bufio.NewReader(input)
+	}
+
 	return &Reader{
-		rd:   bufio.NewReader(io.TeeReader(input, &c)),
+		rd:   reader,
 		size: &c.size,
 	}
 }

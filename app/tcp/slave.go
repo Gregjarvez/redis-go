@@ -36,7 +36,6 @@ func (ss *SlaveServer) Stop() {
 }
 
 func (ss *SlaveServer) handleConnection(rw io.ReadWriter) {
-
 	if conn, ok := rw.(*net.TCPConn); ok {
 		fmt.Println("Slave - New connection from: ", conn.RemoteAddr())
 	}
@@ -112,7 +111,7 @@ func (ss *SlaveServer) connectToMaster() {
 		fmt.Println("Error hydrating datastore: ", err)
 	}
 
-	go ss.handleConnection(rw)
+	ss.handleConnection(rw)
 }
 
 func (ss *SlaveServer) ReplConf(rw bufio.ReadWriter, params ...string) {

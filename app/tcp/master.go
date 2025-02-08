@@ -79,10 +79,10 @@ func (m *MasterServer) handleConnection(rw io.ReadWriter) {
 
 		content.Reset()
 		// If it's a replica connection, exit the loop
-		if isReplicaConnection {
-			//go m.Ack(conn)
-			break
-		}
+		//if isReplicaConnection {
+		//	//go m.Ack(conn)
+		//	break
+		//}
 	}
 }
 

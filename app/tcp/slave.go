@@ -13,7 +13,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"time"
 )
 
 var connectionError = errors.New("error connecting to master")
@@ -60,7 +59,7 @@ func (ss *SlaveServer) handleConnection(conn net.Conn) {
 
 		if err != nil {
 			fmt.Println("Error executing command: ", err)
-			break
+			continue
 		}
 
 		c := bufio.NewWriter(conn)
@@ -69,29 +68,30 @@ func (ss *SlaveServer) handleConnection(conn net.Conn) {
 			com := exec.Command
 
 			if shouldRespondToCommand(com) {
-				for _, r := range result {
-					fmt.Println("Sending result: ", strconv.Quote(string(r)))
-					c.Write(r)
-					c.Flush()
-					time.Sleep(100 * time.Millisecond)
+				err = ss.WriteResults(*c, result)
+
+				if err != nil {
+					fmt.Println("Error writing results: ", err)
+					continue
 				}
 			}
 		}
-
-		content.Reset()
 	}
 }
 
 func (ss *SlaveServer) connectToMaster() {
-	s := strings.Split(*config.Config.ReplicaOf, " ")
-	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%s", s[0], s[1]))
-	fmt.Println("Initializing Handshake: ", conn.RemoteAddr())
+	var conn net.Conn
+	var err error
 
-	if err != nil {
+	s := strings.Split(*config.Config.ReplicaOf, " ")
+	if conn, err = net.Dial("tcp", fmt.Sprintf("%s:%s", s[0], s[1])); err != nil {
 		panic(connectionError)
 	}
 
-	c := bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn))
+	fmt.Println("Initializing Handshake: ", conn.RemoteAddr())
+
+	c := *bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn))
+
 	reader := resp.NewReader(c)
 	ss.Ping(c, reader)
 	ss.ReplConf(c, reader, "listening-port", strconv.Itoa(*config.Config.Port))
@@ -109,7 +109,7 @@ func (ss *SlaveServer) connectToMaster() {
 	go ss.handleConnection(conn)
 }
 
-func (ss *SlaveServer) ReplConf(conn *bufio.ReadWriter, reader *resp.Reader, params ...string) {
+func (ss *SlaveServer) ReplConf(conn bufio.ReadWriter, reader *resp.Reader, params ...string) {
 	args := make([]resp.Value, 0, len(params)+1)
 	args = append(args, resp.BulkStringValue("REPLCONF"))
 
@@ -122,8 +122,11 @@ func (ss *SlaveServer) ReplConf(conn *bufio.ReadWriter, reader *resp.Reader, par
 	)
 
 	response, _ := c.Marshal()
-	_, err := conn.Write(response)
-	conn.Flush()
+
+	if err := ss.WriteResults(*conn.Writer, [][]byte{response}); err != nil {
+		fmt.Println("Error writing ping response: ", err)
+		return
+	}
 
 	r, _, err := reader.ReadValue()
 
@@ -138,15 +141,18 @@ func (ss *SlaveServer) ReplConf(conn *bufio.ReadWriter, reader *resp.Reader, par
 	}
 }
 
-func (ss *SlaveServer) Psync(conn *bufio.ReadWriter, reader *resp.Reader) {
+func (ss *SlaveServer) Psync(conn bufio.ReadWriter, reader *resp.Reader) {
 	p := resp.ArrayValue(
 		resp.BulkStringValue("PSYNC"),
 		resp.BulkStringValue("?"),
 		resp.BulkStringValue("-1"),
 	)
 	response, _ := p.Marshal()
-	conn.Write(response)
-	conn.Flush()
+
+	if err := ss.WriteResults(*conn.Writer, [][]byte{response}); err != nil {
+		fmt.Println("Error writing PSYNC response: ", err)
+		return
+	}
 
 	r, _, err := reader.ReadValue()
 
@@ -157,13 +163,16 @@ func (ss *SlaveServer) Psync(conn *bufio.ReadWriter, reader *resp.Reader) {
 	fmt.Println("PSYNC response: ", r.String())
 }
 
-func (ss *SlaveServer) Ping(conn *bufio.ReadWriter, reader *resp.Reader) {
+func (ss *SlaveServer) Ping(conn bufio.ReadWriter, reader *resp.Reader) {
 	ping := resp.ArrayValue(
 		resp.BulkStringValue("PING"),
 	)
 	s, _ := ping.Marshal()
-	conn.Write(s)
-	conn.Flush()
+
+	if err := ss.WriteResults(*conn.Writer, [][]byte{s}); err != nil {
+		fmt.Println("Error writing ping response: ", err)
+		return
+	}
 
 	r, _, err := reader.ReadValue()
 
@@ -178,7 +187,7 @@ func (ss *SlaveServer) Ping(conn *bufio.ReadWriter, reader *resp.Reader) {
 	}
 }
 
-func getRDBContent(reader *bufio.ReadWriter) ([]byte, error) {
+func getRDBContent(reader bufio.ReadWriter) ([]byte, error) {
 	for {
 		n, err := reader.Peek(1)
 
@@ -190,7 +199,6 @@ func getRDBContent(reader *bufio.ReadWriter) ([]byte, error) {
 			continue
 		}
 
-		fmt.Println("Reading RDB file length ", n)
 		reader.Discard(1) // discard the bulk prefix
 
 		l, err := reader.ReadString('\n')

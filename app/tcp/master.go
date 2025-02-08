@@ -7,9 +7,7 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/config"
 	"io"
 	"net"
-	"strconv"
 	"strings"
-	"time"
 )
 
 type MasterServer struct {
@@ -46,10 +44,10 @@ func (m *MasterServer) handleConnection(conn net.Conn) {
 		content.Write(buf[:n])
 
 		// Process the command
-		results, execErr := m.ExecuteCommands(&content, &conn)
+		results, err := m.ExecuteCommands(&content, &conn)
 
-		if execErr != nil {
-			fmt.Println("Error executing command: ", execErr)
+		if err != nil {
+			fmt.Println("Error executing command: ", err)
 			continue
 		}
 
@@ -63,19 +61,11 @@ func (m *MasterServer) handleConnection(conn net.Conn) {
 				isReplicaConnection = true
 			}
 
-			for _, r := range result {
-				fmt.Println("Sending result: ", strconv.Quote(string(r)))
-				_, err = c.Write(r)
-				if err != nil {
-					fmt.Println("Error writing result: ", err)
-					return
-				}
+			err = m.WriteResults(*c, result)
 
-				err = c.Flush()
-				if err != nil {
-					fmt.Println("Error flushing result: ", err)
-				}
-				time.Sleep(10 * time.Millisecond)
+			if err != nil {
+				fmt.Println("Error writing results: ", err)
+				continue
 			}
 
 			if com.Propagate {

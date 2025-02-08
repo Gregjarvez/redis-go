@@ -1,6 +1,7 @@
 package tcp
 
 import (
+	"bufio"
 	"fmt"
 	"github.com/codecrafters-io/redis-starter-go/app/commands"
 	"github.com/codecrafters-io/redis-starter-go/app/commands/resp"
@@ -8,6 +9,7 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/store"
 	"io"
 	"net"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -117,13 +119,13 @@ func (s *BaseServer) ExecuteCommands(r io.Reader, conn *net.Conn) ([]ExecutionRe
 			return nil, err
 		}
 
-		fmt.Printf("[%s] Processed - %s \n", strings.ToUpper(string(s.Info.Role)), com.String())
-
 		rs, err := com.Execute(commands.DefaultHandlers, commands.RequestContext{
 			Store: s.Datastore,
 			Info:  &s.Info,
 			Conn:  conn,
 		})
+
+		fmt.Printf("[%s] Processed - %s \n", strings.ToUpper(string(s.Info.Role)), com.String())
 
 		if err != nil {
 			fmt.Println("Failed to execute command: ", err)
@@ -137,4 +139,33 @@ func (s *BaseServer) ExecuteCommands(r io.Reader, conn *net.Conn) ([]ExecutionRe
 	}
 
 	return results, nil
+}
+
+func (s *BaseServer) WriteResults(w bufio.Writer, results [][]byte) error {
+	main := results[0]
+
+	fmt.Println("Sending result: ", strconv.Quote(string(main)))
+	if _, err := w.Write(main); err != nil {
+		fmt.Println("Error writing result: ", err)
+		return err
+	}
+	w.Flush()
+
+	rest := results[1:]
+
+	if len(rest) > 0 {
+		go func() {
+			time.Sleep(10 * time.Millisecond)
+
+			for _, r := range rest {
+				fmt.Println("Sending extra result: ", strconv.Quote(string(r)))
+				if _, err := w.Write(r); err != nil {
+					fmt.Println("Error writing extra result: ", err)
+				}
+			}
+			w.Flush()
+		}()
+	}
+
+	return nil
 }

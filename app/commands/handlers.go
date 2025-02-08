@@ -163,8 +163,6 @@ func replConfigHandler(c Command, _ RequestContext) (resp.Value, error) {
 }
 
 func pSyncHandler(c Command, s RequestContext) (resp.Value, error) {
-	s.Info.AddReplica(s.Conn)
-
 	return resp.FlatArrayValue(
 		resp.StringValue(
 			fmt.Sprintf(

@@ -1,7 +1,6 @@
 package tcp
 
 import (
-	"bufio"
 	"fmt"
 	"github.com/codecrafters-io/redis-starter-go/app/commands"
 	"github.com/codecrafters-io/redis-starter-go/app/commands/resp"
@@ -95,7 +94,7 @@ func (s *BaseServer) handleConnections(handleConnection func(conn io.ReadWriter)
 	}
 }
 
-func (s *BaseServer) ExecuteCommands(r io.Reader, conn net.Conn) ([]ExecutionResult, error) {
+func (s *BaseServer) ExecuteCommands(r io.Reader) ([]ExecutionResult, error) {
 	fmt.Println("Executing commands")
 	var (
 		results []ExecutionResult
@@ -123,7 +122,6 @@ func (s *BaseServer) ExecuteCommands(r io.Reader, conn net.Conn) ([]ExecutionRes
 		rs, err := com.Execute(commands.DefaultHandlers, commands.RequestContext{
 			Store: s.Datastore,
 			Info:  &s.Info,
-			Conn:  &conn,
 		})
 
 		fmt.Printf("[%s] Processed - %s \n", strings.ToUpper(string(s.Info.Role)), com.String())
@@ -142,7 +140,7 @@ func (s *BaseServer) ExecuteCommands(r io.Reader, conn net.Conn) ([]ExecutionRes
 	return results, nil
 }
 
-func (s *BaseServer) WriteResults(w bufio.Writer, results [][]byte) error {
+func (s *BaseServer) WriteResults(w io.Writer, results [][]byte) error {
 	if len(results) == 0 {
 		return nil
 	}
@@ -155,19 +153,10 @@ func (s *BaseServer) WriteResults(w bufio.Writer, results [][]byte) error {
 		return fmt.Errorf("write main result: %w", err)
 	}
 
-	fmt.Println("Flushing")
-	if err := w.Flush(); err != nil {
-		return fmt.Errorf("flush main result: %w", err)
-	}
-
 	for _, r := range results[1:] {
 		fmt.Println("Sending result remaining: ", strconv.Quote(string(r)))
 		if _, err := w.Write(r); err != nil {
 			return fmt.Errorf("write additional result: %w", err)
-		}
-
-		if err := w.Flush(); err != nil {
-			return fmt.Errorf("flush additional result: %w", err)
 		}
 		time.Sleep(10 * time.Millisecond)
 	}

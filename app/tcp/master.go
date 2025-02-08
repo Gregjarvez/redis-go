@@ -1,7 +1,6 @@
 package tcp
 
 import (
-	"bufio"
 	"bytes"
 	"fmt"
 	"github.com/codecrafters-io/redis-starter-go/app/commands/resp"
@@ -51,14 +50,12 @@ func (m *MasterServer) handleConnection(rw io.ReadWriter) {
 		content.Write(buf[:n])
 
 		// Process the command
-		results, err := m.ExecuteCommands(&content, conn)
+		results, err := m.ExecuteCommands(&content)
 
 		if err != nil {
 			fmt.Println("Error executing command: ", err)
 			continue
 		}
-
-		c := bufio.NewWriter(conn)
 
 		for _, exec := range results {
 			result := exec.Results
@@ -68,7 +65,7 @@ func (m *MasterServer) handleConnection(rw io.ReadWriter) {
 				isReplicaConnection = true
 			}
 
-			err = m.WriteResults(*c, result)
+			err = m.WriteResults(conn, result)
 
 			if err != nil {
 				fmt.Println("Error writing results: ", err)
@@ -145,7 +142,7 @@ func (m *MasterServer) Ack(conn net.Conn) {
 	)
 	ack, _ := v.Marshal()
 
-	if err := m.WriteResults(*bufio.NewWriter(conn), [][]byte{ack}); err != nil {
+	if err := m.WriteResults(conn, [][]byte{ack}); err != nil {
 		fmt.Println("Error writing ack response: ", err)
 		return
 	}

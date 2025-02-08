@@ -61,21 +61,19 @@ func (ss *SlaveServer) handleConnection(rw io.ReadWriter) {
 
 		content.Write(buf[:n])
 
-		results, err := ss.ExecuteCommands(&content, conn)
+		results, err := ss.ExecuteCommands(&content)
 
 		if err != nil {
 			fmt.Println("Error executing command: ", err)
 			continue
 		}
 
-		c := bufio.NewWriter(rw)
-
 		for _, exec := range results {
 			result := exec.Results
 			com := exec.Command
 
 			if shouldRespondToCommand(com) {
-				err = ss.WriteResults(*c, result)
+				err = ss.WriteResults(conn, result)
 
 				if err != nil {
 					fmt.Println("Error writing results: ", err)
@@ -132,7 +130,7 @@ func (ss *SlaveServer) ReplConf(rw bufio.ReadWriter, params ...string) {
 
 	response, _ := c.Marshal()
 
-	if err := ss.WriteResults(*rw.Writer, [][]byte{response}); err != nil {
+	if err := ss.WriteResults(rw.Writer, [][]byte{response}); err != nil {
 		fmt.Println("Error writing ping response: ", err)
 		return
 	}
@@ -158,7 +156,7 @@ func (ss *SlaveServer) Psync(conn bufio.ReadWriter) {
 	)
 	m, _ := p.Marshal()
 
-	if err := ss.WriteResults(*conn.Writer, [][]byte{m}); err != nil {
+	if err := ss.WriteResults(conn.Writer, [][]byte{m}); err != nil {
 		fmt.Println("Error writing PSYNC response: ", err)
 		return
 	}
@@ -184,7 +182,7 @@ func (ss *SlaveServer) Ping(rw bufio.ReadWriter) {
 	)
 	s, _ := ping.Marshal()
 
-	if err := ss.WriteResults(*rw.Writer, [][]byte{s}); err != nil {
+	if err := ss.WriteResults(rw.Writer, [][]byte{s}); err != nil {
 		fmt.Println("Error writing ping response: ", err)
 		return
 	}

@@ -59,6 +59,7 @@ func (m *MasterServer) handleConnection(rw io.ReadWriter) {
 		}
 
 		c := bufio.NewWriter(conn)
+		
 		fmt.Println("Writing results", results)
 		for _, exec := range results {
 			result := exec.Results

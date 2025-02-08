@@ -149,6 +149,7 @@ func (s *BaseServer) WriteResults(w bufio.Writer, results [][]byte) error {
 	main := results[0]
 
 	fmt.Println("Sending result: ", strconv.Quote(string(main)))
+
 	if _, err := w.Write(main); err != nil {
 		return fmt.Errorf("write main result: %w", err)
 	}
@@ -158,6 +159,7 @@ func (s *BaseServer) WriteResults(w bufio.Writer, results [][]byte) error {
 	}
 
 	for _, r := range results[1:] {
+		fmt.Println("Sending result remaining: ", strconv.Quote(string(r)))
 		if _, err := w.Write(r); err != nil {
 			return fmt.Errorf("write additional result: %w", err)
 		}
@@ -165,6 +167,7 @@ func (s *BaseServer) WriteResults(w bufio.Writer, results [][]byte) error {
 		if err := w.Flush(); err != nil {
 			return fmt.Errorf("flush additional result: %w", err)
 		}
+		time.Sleep(10 * time.Millisecond)
 	}
 
 	return nil

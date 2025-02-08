@@ -52,7 +52,7 @@ func (m *MasterServer) handleConnection(conn net.Conn) {
 		}
 
 		c := bufio.NewWriter(conn)
-
+		fmt.Println("Writing results", results)
 		for _, exec := range results {
 			result := exec.Results
 			com := exec.Command
@@ -75,7 +75,6 @@ func (m *MasterServer) handleConnection(conn net.Conn) {
 		}
 
 		content.Reset()
-
 		// If it's a replica connection, exit the loop
 		if isReplicaConnection {
 			break

@@ -176,16 +176,16 @@ func (v *Value) Marshal() ([]byte, error) {
 
 func (v *Value) format() []byte {
 	var b bytes.Buffer
-	b.Write([]byte(string(v.Type)))
+	b.WriteString(string(v.Type))
 
 	if v.Type == BulkString {
-		b.Write([]byte(fmt.Sprintf("%d\r\n", len(v.Raw))))
+		b.WriteString(fmt.Sprintf("%d\r\n", len(v.Raw)))
 	}
 
 	b.Write(v.Raw)
 
 	if !v.BulkLike {
-		b.Write([]byte("\r\n"))
+		b.WriteString("\r\n")
 	}
 
 	return b.Bytes()

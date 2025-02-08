@@ -60,7 +60,7 @@ func NewInfo(config Configuration) Info {
 }
 
 func generateReplicationId() (string, error) {
-	bytes := make([]byte, 40)
+	bytes := make([]byte, 20)
 	_, err := rand.Read(bytes)
 
 	if err != nil {

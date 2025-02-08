@@ -26,8 +26,8 @@ func (m *MasterServer) Stop() {
 
 func (m *MasterServer) handleConnection(rw io.ReadWriter) {
 	var (
-		content             bytes.Buffer
-		isReplicaConnection bool
+		content bytes.Buffer
+		//isReplicaConnection bool
 	)
 
 	if conn, ok := rw.(*net.TCPConn); ok {
@@ -61,7 +61,7 @@ func (m *MasterServer) handleConnection(rw io.ReadWriter) {
 			com := exec.Command
 
 			if strings.ToUpper(com.Type) == "PSYNC" {
-				isReplicaConnection = true
+				//isReplicaConnection = true
 			}
 
 			err = m.WriteResults(rw, result)

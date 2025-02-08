@@ -25,15 +25,20 @@ func (m *MasterServer) Stop() {
 	m.StopListener()
 }
 
-func (m *MasterServer) handleConnection(conn net.Conn) {
+func (m *MasterServer) handleConnection(rw io.ReadWriter) {
 	var (
 		content             bytes.Buffer
 		isReplicaConnection bool
 	)
+	var conn *net.TCPConn
+
+	if conn, ok := rw.(*net.TCPConn); ok {
+		fmt.Println("Slave - New connection from: ", conn.RemoteAddr())
+	}
 
 	for {
 		buf := make([]byte, 1024)
-		n, err := conn.Read(buf)
+		n, err := rw.Read(buf)
 		if err != nil {
 			if err == io.EOF {
 				fmt.Println("Client disconnected")
@@ -46,7 +51,7 @@ func (m *MasterServer) handleConnection(conn net.Conn) {
 		content.Write(buf[:n])
 
 		// Process the command
-		results, err := m.ExecuteCommands(&content, &conn)
+		results, err := m.ExecuteCommands(&content, conn)
 
 		if err != nil {
 			fmt.Println("Error executing command: ", err)

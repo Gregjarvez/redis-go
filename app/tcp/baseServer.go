@@ -39,7 +39,7 @@ type BaseServer struct {
 	CommandsChannel chan []byte
 }
 
-func (s *BaseServer) StartListener(handleConnection func(conn net.Conn)) {
+func (s *BaseServer) StartListener(handleConnection func(conn io.ReadWriter)) {
 	s.wg.Add(2)
 	go s.acceptConnections()
 	go s.handleConnections(handleConnection)
@@ -80,7 +80,7 @@ func (s *BaseServer) acceptConnections() {
 	}
 }
 
-func (s *BaseServer) handleConnections(handleConnection func(conn net.Conn)) {
+func (s *BaseServer) handleConnections(handleConnection func(conn io.ReadWriter)) {
 	defer s.wg.Done()
 
 	for {
@@ -95,7 +95,8 @@ func (s *BaseServer) handleConnections(handleConnection func(conn net.Conn)) {
 	}
 }
 
-func (s *BaseServer) ExecuteCommands(r io.Reader, conn *net.Conn) ([]ExecutionResult, error) {
+func (s *BaseServer) ExecuteCommands(r io.Reader, conn net.Conn) ([]ExecutionResult, error) {
+	fmt.Println("Executing commands")
 	var (
 		results []ExecutionResult
 	)
@@ -122,7 +123,7 @@ func (s *BaseServer) ExecuteCommands(r io.Reader, conn *net.Conn) ([]ExecutionRe
 		rs, err := com.Execute(commands.DefaultHandlers, commands.RequestContext{
 			Store: s.Datastore,
 			Info:  &s.Info,
-			Conn:  conn,
+			Conn:  &conn,
 		})
 
 		fmt.Printf("[%s] Processed - %s \n", strings.ToUpper(string(s.Info.Role)), com.String())

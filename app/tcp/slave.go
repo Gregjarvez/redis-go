@@ -35,15 +35,21 @@ func (ss *SlaveServer) Stop() {
 	ss.StopListener()
 }
 
-func (ss *SlaveServer) handleConnection(conn net.Conn) {
-	fmt.Println("Slave - New connection from: ", conn.RemoteAddr())
+func (ss *SlaveServer) handleConnection(rw io.ReadWriter) {
+	var conn *net.TCPConn
+
+	if conn, ok := rw.(*net.TCPConn); ok {
+		fmt.Println("Slave - New connection from: ", conn.RemoteAddr())
+	}
+
 	var (
 		content bytes.Buffer
 	)
 
 	for {
 		buf := make([]byte, 1024)
-		n, err := conn.Read(buf)
+		n, err := rw.Read(buf)
+
 		if err != nil {
 			if err == io.EOF {
 				fmt.Println("Client disconnected")
@@ -55,14 +61,15 @@ func (ss *SlaveServer) handleConnection(conn net.Conn) {
 
 		content.Write(buf[:n])
 
-		results, err := ss.ExecuteCommands(&content, &conn)
+		results, err := ss.ExecuteCommands(&content, conn)
 
 		if err != nil {
 			fmt.Println("Error executing command: ", err)
 			continue
 		}
 
-		c := bufio.NewWriter(conn)
+		c := bufio.NewWriter(rw)
+
 		for _, exec := range results {
 			result := exec.Results
 			com := exec.Command
@@ -108,7 +115,7 @@ func (ss *SlaveServer) connectToMaster() {
 		fmt.Println("Error hydrating datastore: ", err)
 	}
 
-	ss.Connections <- conn
+	go ss.handleConnection(rw)
 }
 
 func (ss *SlaveServer) ReplConf(rw bufio.ReadWriter, params ...string) {
@@ -167,7 +174,7 @@ func (ss *SlaveServer) Psync(conn bufio.ReadWriter) {
 
 	if !strings.Contains(r, "FULLRESYNC") {
 		fmt.Println("PSYNC failed - invalid response")
-		return
+		panic("PSYNC failed - invalid response")
 	}
 }
 

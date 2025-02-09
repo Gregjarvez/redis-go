@@ -44,7 +44,12 @@ var DefaultHandlers = commandRouter{
 		"REPLCONF": replConfigHandler,
 		"PSYNC":    pSyncHandler,
 		"COMMAND":  docHandler,
+		"WAIT":     waitHandler,
 	},
+}
+
+func waitHandler(_ Command, s RequestContext) (result resp.Value, err error) {
+	return resp.IntegerValue(len(s.Info.Replicas)), nil
 }
 
 func pingHandler(_ Command, _ RequestContext) (resp.Value, error) {

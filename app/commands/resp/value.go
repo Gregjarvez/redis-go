@@ -43,6 +43,14 @@ func StringValue(s string) Value {
 	}
 }
 
+func IntegerValue(i int) Value {
+	return Value{
+		Type:  Integer,
+		Raw:   []byte(strconv.Itoa(i)),
+		IsNil: i == 0,
+	}
+}
+
 func BulkLikeStringValue(s []byte) Value {
 	return Value{
 		Type:     BulkString,

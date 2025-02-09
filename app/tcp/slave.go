@@ -24,6 +24,7 @@ var PropagatedCommand = []string{
 
 type SlaveServer struct {
 	*BaseServer
+	HandShake bool
 }
 
 func (ss *SlaveServer) Start() {
@@ -70,9 +71,9 @@ func (ss *SlaveServer) handleConnection(rw io.ReadWriter) {
 			result := exec.Results
 			com := exec.Command
 
-			ss.Info.IncrementReplOffset(len(com.Raw))
+			fmt.Printf("Incrementing offset: %s -> len(%v) \n", strconv.Quote(string(com.Raw)), len(com.Raw))
 
-			if shouldRespondToCommand(com) {
+			if ss.shouldRespondToCommand(com) {
 				err = ss.WriteResults(rw, result)
 
 				if err != nil {
@@ -95,7 +96,7 @@ func (ss *SlaveServer) connectToMaster() {
 		panic(connectionError)
 	}
 
-	fmt.Println("Initializing Handshake: ", conn.RemoteAddr())
+	fmt.Println("Initializing HandShake: ", conn.RemoteAddr())
 
 	rw := bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn))
 
@@ -115,7 +116,8 @@ func (ss *SlaveServer) connectToMaster() {
 		fmt.Println("Error hydrating datastore: ", err)
 	}
 
-	ss.handleConnection(rw)
+	ss.HandShake = true
+	go ss.handleConnection(rw)
 }
 
 func (ss *SlaveServer) ReplConf(rw bufio.ReadWriter, params ...string) {
@@ -238,6 +240,10 @@ func getRDBContent(rw bufio.ReadWriter) ([]byte, error) {
 	return buf, nil
 }
 
-func shouldRespondToCommand(c *commands.Command) bool {
+func (ss *SlaveServer) shouldRespondToCommand(c *commands.Command) bool {
+	if ss.HandShake {
+		PropagatedCommand = append(PropagatedCommand, "PING")
+	}
+
 	return !slices.Contains(PropagatedCommand, strings.ToUpper(c.Type))
 }

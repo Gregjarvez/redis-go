@@ -6,6 +6,7 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/commands/resp"
 	"github.com/codecrafters-io/redis-starter-go/app/config"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -149,13 +150,13 @@ func infoHandler(c Command, context RequestContext) (resp.Value, error) {
 	}
 }
 
-func replConfigHandler(c Command, _ RequestContext) (resp.Value, error) {
+func replConfigHandler(c Command, s RequestContext) (resp.Value, error) {
 	switch strings.ToUpper(c.Args[0]) {
 	case "GETACK":
 		return resp.ArrayValue(
 			resp.BulkStringValue("REPLCONF"),
 			resp.BulkStringValue("ACK"),
-			resp.BulkStringValue("0"),
+			resp.BulkStringValue(strconv.FormatInt(s.Info.GetReplOffset(), 10)),
 		), nil
 	default:
 		return resp.StringValue("OK"), nil
@@ -168,7 +169,7 @@ func pSyncHandler(c Command, s RequestContext) (resp.Value, error) {
 			fmt.Sprintf(
 				"FULLRESYNC %s %v",
 				s.Info.MasterReplid,
-				s.Info.GetReplOffset(),
+				"0", // s.Info.GetReplOffset()
 			),
 		),
 		resp.BulkLikeStringValue(s.Store.Dump()),

@@ -132,6 +132,8 @@ func (s *BaseServer) ExecuteCommands(r io.Reader) ([]ExecutionResult, error) {
 			return nil, err
 		}
 
+		s.Info.IncrementReplOffset(len(com.Raw))
+
 		results = append(results, ExecutionResult{
 			Results: rs,
 			Command: &com,
@@ -141,16 +143,7 @@ func (s *BaseServer) ExecuteCommands(r io.Reader) ([]ExecutionResult, error) {
 	return results, nil
 }
 
-func (s *BaseServer) WriteResults(writer io.Writer, results [][]byte) error {
-	var w *bufio.Writer
-	if existingWriter, ok := writer.(*bufio.Writer); ok {
-		w = existingWriter
-	} else {
-		w = bufio.NewWriter(writer)
-	}
-
-	defer w.Flush()
-
+func (s *BaseServer) WriteResults(w io.Writer, results [][]byte) error {
 	if len(results) == 0 {
 		return nil
 	}
@@ -163,7 +156,7 @@ func (s *BaseServer) WriteResults(writer io.Writer, results [][]byte) error {
 		return fmt.Errorf("write main result: %w", err)
 	}
 
-	if err := w.Flush(); err != nil {
+	if err := flush(w); err != nil {
 		return fmt.Errorf("flush main result: %w", err)
 	}
 
@@ -173,11 +166,24 @@ func (s *BaseServer) WriteResults(writer io.Writer, results [][]byte) error {
 			return fmt.Errorf("write additional result: %w", err)
 		}
 
-		if err := w.Flush(); err != nil {
+		if err := flush(w); err != nil {
 			return fmt.Errorf("flush additional result: %w", err)
 		}
-		time.Sleep(10 * time.Millisecond)
+		//time.Sleep(10 * time.Millisecond)
 	}
 
+	return nil
+}
+
+func flush(w io.Writer) error {
+	// If the writer is part of a *bufio.ReadWriter, flush its Writer field
+	if rw, ok := w.(*bufio.ReadWriter); ok {
+		return rw.Writer.Flush()
+	}
+
+	// Otherwise, check if it's a standalone *bufio.Writer and flush
+	if bufWriter, ok := w.(*bufio.Writer); ok {
+		return bufWriter.Flush()
+	}
 	return nil
 }

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -28,7 +29,7 @@ type Replica struct {
 type Info struct {
 	Role             Role
 	MasterReplid     string
-	MasterReplOffset int64
+	MasterReplOffset atomic.Int64
 
 	ReplicaMutex sync.RWMutex
 	Replicas     map[string]*Replica
@@ -38,7 +39,7 @@ func NewInfo(config Configuration) Info {
 	var (
 		role                = Slave
 		masterReplicaId     = ""
-		masterReplicaOffset = int64(0)
+		masterReplicaOffset atomic.Int64
 	)
 
 	if *config.ReplicaOf == "" {
@@ -74,7 +75,7 @@ func (i *Info) String() string {
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("role:%s\r\n", i.Role))
 	sb.WriteString(fmt.Sprintf("master_replid:%s\r\n", i.MasterReplid))
-	sb.WriteString(fmt.Sprintf("master_repl_offset:%d\r\n", i.MasterReplOffset))
+	sb.WriteString(fmt.Sprintf("master_repl_offset:%s\r\n", strconv.FormatInt(i.MasterReplOffset.Load(), 10)))
 
 	return sb.String()
 }
@@ -133,10 +134,10 @@ func (i *Info) RemoveReplica(k string) {
 	delete(i.Replicas, k)
 }
 
-func (i *Info) IncrementReplOffset(offset int) {
-	atomic.AddInt64(&i.MasterReplOffset, int64(offset))
+func (i *Info) IncrementReplOffset(delta int) {
+	i.MasterReplOffset.Add(int64(delta))
 }
 
 func (i *Info) GetReplOffset() int64 {
-	return atomic.LoadInt64(&i.MasterReplOffset)
+	return i.MasterReplOffset.Load()
 }

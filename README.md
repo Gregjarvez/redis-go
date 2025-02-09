@@ -11,8 +11,12 @@ This project leverages **Go'store networking** and **concurrency features** to s
     - `KEYS` - Fetches keys matching a pattern (currently supports `*` wildcard).
     - `INFO` - Provides server information.
     - `REPLCONF` - Acknowledge and synchronize replica configuration.
+      - `GETACK` - Replica synchronisation
+      - `ACK` -  Replica synchronisation
     - `PSYNC` - Implements full resynchronization for replica servers.
-    - `COMMAND` - Outputs "Welcome" for documentation purposes.
+    - `COMMAND` for documentation purposes.
+      - `DOCS`- Server documentation. Currently just returns Welcome
+    - `WAIT` - Replica consistency - This command blocks the current client until all the previous write commands are successfully transferred and acknowledged by at least the number of replicas you specify in the numreplicas argument.
 
 
 ## Prerequisites
@@ -99,6 +103,8 @@ Retrieve configurations:
 
 ## Replication
 This server supports a basic implementation of redis' **master server replication**, allowing replicas to synchronize with the master for data consistency.
+The server supports **replica synchronization and replica command acknowledgment** to ensure consistency and coordination between the master server and its replicas. Replication is implemented to allow replicas to stay synchronized with the master server, especially for critical commands and state updates. The commands related to replica synchronization include:
+
 
 
 ## Project Goals

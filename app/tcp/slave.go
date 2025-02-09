@@ -60,7 +60,7 @@ func (ss *SlaveServer) handleConnection(rw io.ReadWriter) {
 
 		content.Write(buf[:n])
 
-		results, err := ss.ExecuteCommands(&content)
+		results, err := ss.ExecuteCommands(&content, nil)
 
 		if err != nil {
 			fmt.Println("Error executing command: ", err)

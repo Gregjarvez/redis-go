@@ -25,10 +25,10 @@ func (m *MasterServer) Stop() {
 
 func (m *MasterServer) handleConnection(rw io.ReadWriter) {
 	var (
-		content             bytes.Buffer
-		isReplicaConnection bool
+		//isReplicaConnection bool
+		conn    net.Conn
+		content bytes.Buffer
 	)
-	var conn net.Conn
 
 	if connection, ok := rw.(*net.TCPConn); ok {
 		fmt.Println("Master - New connection from: ", connection.RemoteAddr())
@@ -40,17 +40,17 @@ func (m *MasterServer) handleConnection(rw io.ReadWriter) {
 		n, err := rw.Read(buf)
 		if err != nil {
 			if err == io.EOF {
-				fmt.Println("Client disconnected")
+				fmt.Println("HandleConnection - Client disconnected")
 				break
 			}
 			fmt.Println("Read error:", err)
-			return
+			break
 		}
 
 		content.Write(buf[:n])
 
 		// Process the command
-		results, err := m.ExecuteCommands(&content)
+		results, err := m.ExecuteCommands(&content, conn)
 
 		if err != nil {
 			fmt.Println("Error executing command: ", err)
@@ -62,8 +62,9 @@ func (m *MasterServer) handleConnection(rw io.ReadWriter) {
 			com := exec.Command
 
 			if strings.ToUpper(com.Type) == "PSYNC" {
-				m.Replication.AddReplica(conn, &m.CommandsChannel)
-				isReplicaConnection = true
+				m.Replication.AddReplica(conn)
+				//isReplicaConnection = true
+				fmt.Println("Replica connected: ", conn.RemoteAddr().String())
 			}
 
 			err = m.WriteResults(rw, result)
@@ -81,10 +82,10 @@ func (m *MasterServer) handleConnection(rw io.ReadWriter) {
 
 		content.Reset()
 		// If it's a replica connection, exit the loop
-		if isReplicaConnection {
-			fmt.Println("Replica connection detected, exiting read loop")
-			break
-		}
+		//if isReplicaConnection {
+		//	//fmt.Println("Replica connection detected, exiting read loop")
+		//	//break
+		//}
 	}
 }
 

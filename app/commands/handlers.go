@@ -6,6 +6,7 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/commands/resp"
 	"github.com/codecrafters-io/redis-starter-go/app/services"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
+	"math"
 	"strconv"
 	"strings"
 	"sync"
@@ -66,20 +67,37 @@ func waitHandler(c Command, s RequestContext) (result resp.Value, err error) {
 		return resp.IntegerValue(0), nil
 	}
 
-	if len(s.Replication.ReplicaPendingGetAck) == 0 {
+	// check documentation
+	if len(s.Store.Keys()) == 0 {
 		return resp.IntegerValue(len(s.Replication.Replicas)), nil
 	}
 
-	wg.Add(replicaCount)
+	replicas := s.Replication.Replicas
 
-	for i := 0; i < replicaCount; i++ {
+	requestAck := int(math.Max(float64(replicaCount), float64(len(replicas))))
+
+	wg.Add(requestAck)
+
+	for _, replica := range replicas {
+		tcpConn := replica.Conn
+
+		if err := s.Replication.GetAck(tcpConn); err != nil {
+			fmt.Println("Failed to send ack to replica:", tcpConn.RemoteAddr())
+		}
+
 		go func() {
+			//if err := s.Replication.Ack(tcpConn); err != nil {
+			//	fmt.Println("Failed to send ack to replica:", tcpConn.RemoteAddr())
+			//}
+
 			if <-s.Replication.ReplicaAck; true {
 				acked.Add(1)
 				wg.Done()
-				fmt.Println("Wait - Replica ack")
+				fmt.Println("++++++Replica ack+++++")
 			}
 		}()
+
+		requestAck--
 	}
 	// A timeout of 0 means to block forever.
 	// not implemented at the moment
@@ -92,7 +110,7 @@ func waitHandler(c Command, s RequestContext) (result resp.Value, err error) {
 
 	select {
 	case <-done:
-		fmt.Println("Replicas acked")
+		fmt.Println("All Wait Request ACKs received.")
 	case <-time.After(time.Duration(timeout) * time.Millisecond):
 		fmt.Println("Timed out waiting for replicas to ack")
 		return resp.IntegerValue(int(acked.Load())), nil
@@ -206,8 +224,6 @@ func infoHandler(c Command, context RequestContext) (resp.Value, error) {
 }
 
 func replConfigHandler(c Command, s RequestContext) (resp.Value, error) {
-	fmt.Println("Replconf: ", c.Args)
-
 	switch strings.ToUpper(c.Args[0]) {
 	case "GETACK":
 		return resp.ArrayValue(
@@ -215,6 +231,16 @@ func replConfigHandler(c Command, s RequestContext) (resp.Value, error) {
 			resp.BulkStringValue("ACK"),
 			resp.BulkStringValue(strconv.FormatInt(s.Replication.GetReplOffset(), 10)),
 		), nil
+	case "ACK":
+		if s.Conn != nil {
+			replica := s.Replication.GetReplica(s.Conn)
+			if replica == nil {
+				return resp.ErrorValue("ERR: no replica connection"), nil
+			}
+
+			replica.Ack <- true
+		}
+		return resp.FlatArrayValue(), nil
 	default:
 		return resp.StringValue("OK"), nil
 	}

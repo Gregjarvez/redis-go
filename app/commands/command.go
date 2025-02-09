@@ -6,6 +6,7 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/commands/resp"
 	"github.com/codecrafters-io/redis-starter-go/app/services"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
+	"net"
 	"strings"
 )
 
@@ -19,6 +20,7 @@ type Command struct {
 type RequestContext struct {
 	Store       store.DataStore
 	Replication *services.ReplicationService
+	Conn        net.Conn
 }
 
 func NewCommand(value resp.Value) (Command, error) {

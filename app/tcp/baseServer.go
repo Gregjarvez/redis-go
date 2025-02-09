@@ -95,7 +95,7 @@ func (s *BaseServer) handleConnections(handleConnection func(conn io.ReadWriter)
 	}
 }
 
-func (s *BaseServer) ExecuteCommands(r io.Reader) ([]ExecutionResult, error) {
+func (s *BaseServer) ExecuteCommands(r io.Reader, conn net.Conn) ([]ExecutionResult, error) {
 	var (
 		results []ExecutionResult
 	)
@@ -124,6 +124,7 @@ func (s *BaseServer) ExecuteCommands(r io.Reader) ([]ExecutionResult, error) {
 		rs, err := com.Execute(commands.DefaultHandlers, commands.RequestContext{
 			Store:       s.Datastore,
 			Replication: s.Replication,
+			Conn:        conn,
 		})
 
 		fmt.Printf("[%s] Processed - %s \n", strings.ToUpper(string(s.Replication.Role)), com.String())

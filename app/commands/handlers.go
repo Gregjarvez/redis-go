@@ -85,17 +85,17 @@ func waitHandler(c Command, s RequestContext) (result resp.Value, err error) {
 			fmt.Println("Failed to send ack to replica:", tcpConn.RemoteAddr())
 		}
 
-		go func() {
+		go func(r *services.Replica) {
 			//if err := s.Replication.Ack(tcpConn); err != nil {
 			//	fmt.Println("Failed to send ack to replica:", tcpConn.RemoteAddr())
 			//}
 
-			if <-s.Replication.ReplicaAck; true {
+			if <-r.Ack; true {
 				acked.Add(1)
 				wg.Done()
 				fmt.Println("++++++Replica ack+++++")
 			}
-		}()
+		}(replica)
 
 		requestAck--
 	}

@@ -119,7 +119,7 @@ func (s *BaseServer) ExecuteCommands(r io.Reader, conn net.Conn) ([]ExecutionRes
 			return nil, err
 		}
 
-		fmt.Println("Received command: ", com.String())
+		fmt.Printf("[%s] Received command: - %s \n", strings.ToUpper(string(s.Replication.Role)), com.String())
 
 		rs, err := com.Execute(commands.DefaultHandlers, commands.RequestContext{
 			Store:       s.Datastore,

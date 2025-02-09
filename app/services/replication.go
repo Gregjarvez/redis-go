@@ -149,6 +149,7 @@ func (i *ReplicationService) RemoveReplica(k string) {
 
 	replica.Conn.Close()
 	close(replica.Queue)
+	close(replica.Ack)
 
 	delete(i.Replicas, k)
 }
@@ -180,33 +181,6 @@ func (i *ReplicationService) GetAck(conn net.Conn) error {
 	if err := utils.Flush(conn); err != nil {
 		fmt.Println("Error flushing ack response: ", err)
 		return err
-	}
-
-	return nil
-}
-
-func (i *ReplicationService) Ack(conn net.Conn) error {
-	for {
-		buf := make([]byte, 1024)
-		n, err := conn.Read(buf)
-
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			fmt.Println("Error reading ack response: ", err)
-			//Since WAIT returns the number of replicas reached both in case of failure and success
-
-			i.ReplicaAck <- true
-			break
-		}
-
-		// create a proper resp value and compare.
-		if strings.Contains(string(buf[:n]), "ACK") {
-			fmt.Printf("Received ack -> %s \n", conn.RemoteAddr().String())
-			i.ReplicaAck <- true
-			break
-		}
 	}
 
 	return nil

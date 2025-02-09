@@ -1,15 +1,14 @@
 package commands
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/codecrafters-io/redis-starter-go/app/commands/resp"
 	"github.com/codecrafters-io/redis-starter-go/app/services"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
-	"math"
 	"strconv"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -58,7 +57,6 @@ func waitHandler(c Command, s RequestContext) (result resp.Value, err error) {
 
 	var (
 		acked           atomic.Int32
-		wg              sync.WaitGroup
 		replicaCount, _ = strconv.Atoi(c.Args[0])
 		timeout, _      = strconv.Atoi(c.Args[1])
 	)
@@ -73,51 +71,41 @@ func waitHandler(c Command, s RequestContext) (result resp.Value, err error) {
 	}
 
 	replicas := s.Replication.Replicas
+	results := make(chan struct{}, len(replicas))
 
-	requestAck := int(math.Max(float64(replicaCount), float64(len(replicas))))
-
-	wg.Add(requestAck)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Millisecond)
+	defer cancel()
 
 	for _, replica := range replicas {
 		tcpConn := replica.Conn
 
 		if err := s.Replication.GetAck(tcpConn); err != nil {
-			fmt.Println("Failed to send ack to replica:", tcpConn.RemoteAddr())
+			fmt.Println("Failed to send GetAck request to replica:", tcpConn.RemoteAddr())
+			continue
 		}
 
 		go func(r *services.Replica) {
-			//if err := s.Replication.Ack(tcpConn); err != nil {
-			//	fmt.Println("Failed to send ack to replica:", tcpConn.RemoteAddr())
-			//}
-
-			if <-r.Ack; true {
-				acked.Add(1)
-				wg.Done()
-				fmt.Println("++++++Replica ack+++++")
+			select {
+			case <-r.Ack:
+				results <- struct{}{}
+			case <-ctx.Done():
+				fmt.Println("Timeout or cancel signal received for replica:", r.Conn.RemoteAddr())
 			}
 		}(replica)
-
-		requestAck--
 	}
-	// A timeout of 0 means to block forever.
-	// not implemented at the moment
-	done := make(chan struct{})
 
 	go func() {
-		wg.Wait()
-		close(done)
+		for range results {
+			acked.Add(1)
+		}
 	}()
 
-	select {
-	case <-done:
-		fmt.Println("All Wait Request ACKs received.")
-	case <-time.After(time.Duration(timeout) * time.Millisecond):
-		fmt.Println("Timed out waiting for replicas to ack")
-		return resp.IntegerValue(int(acked.Load())), nil
-	}
+	<-ctx.Done()
 
-	fmt.Println(acked.Load(), " replicas acked")
-	return resp.IntegerValue(int(acked.Load())), nil
+	finalAcked := acked.Load()
+	fmt.Println("Final acked count:", finalAcked)
+
+	return resp.IntegerValue(int(finalAcked)), nil
 }
 
 func pingHandler(_ Command, _ RequestContext) (resp.Value, error) {

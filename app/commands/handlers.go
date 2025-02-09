@@ -82,6 +82,7 @@ func waitHandler(c Command, s RequestContext) (result resp.Value, err error) {
 		}()
 	}
 	// A timeout of 0 means to block forever.
+	// not implemented at the moment
 	done := make(chan struct{})
 
 	go func() {

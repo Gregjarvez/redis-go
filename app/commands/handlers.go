@@ -66,7 +66,7 @@ func waitHandler(c Command, s RequestContext) (result resp.Value, err error) {
 		return resp.IntegerValue(0), nil
 	}
 
-	if len(s.Replication.ReplicaPendingAck) == 0 {
+	if len(s.Replication.ReplicaPendingGetAck) == 0 {
 		return resp.IntegerValue(len(s.Replication.Replicas)), nil
 	}
 

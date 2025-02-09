@@ -62,7 +62,7 @@ func (m *MasterServer) handleConnection(rw io.ReadWriter) {
 			com := exec.Command
 
 			if strings.ToUpper(com.Type) == "PSYNC" {
-				m.Replication.AddReplica(conn)
+				m.Replication.AddReplica(conn, &m.CommandsChannel)
 				isReplicaConnection = true
 			}
 

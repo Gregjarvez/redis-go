@@ -36,8 +36,8 @@ type ReplicationService struct {
 	ReplicaMutex sync.RWMutex
 	Replicas     map[string]*Replica
 
-	ReplicaAck        chan bool
-	ReplicaPendingAck chan bool
+	ReplicaAck           chan bool
+	ReplicaPendingGetAck chan bool
 }
 
 func NewReplicationService(config Configuration) *ReplicationService {
@@ -61,7 +61,7 @@ func NewReplicationService(config Configuration) *ReplicationService {
 	if role == Master {
 		replication.Replicas = make(map[string]*Replica)
 		replication.ReplicaAck = make(chan bool, 100)
-		replication.ReplicaPendingAck = make(chan bool, 100)
+		replication.ReplicaPendingGetAck = make(chan bool, 100)
 	}
 
 	return &replication
@@ -95,7 +95,7 @@ func (i *ReplicationService) IsSlave() bool {
 	return i.Role == Slave
 }
 
-func (i *ReplicationService) AddReplica(conn net.Conn) {
+func (i *ReplicationService) AddReplica(conn net.Conn, commandQueue *chan []byte) {
 	if !i.IsMaster() {
 		fmt.Println("Not a master, cannot add replica")
 		return
@@ -133,16 +133,20 @@ func (i *ReplicationService) AddReplica(conn net.Conn) {
 				fmt.Println("Failed to flush data to replica:", tcpConn.RemoteAddr())
 			}
 
-			if err := i.GetAck(tcpConn); err != nil {
-				fmt.Println("Failed to send ack to replica:", tcpConn.RemoteAddr())
-			}
-
-			go func() {
-				err := i.Ack(tcpConn)
-				if err != nil {
-					fmt.Println("Failed to receive ack from replica:", tcpConn.RemoteAddr())
+			if len(*commandQueue) > 0 {
+				if err := i.GetAck(tcpConn); err != nil {
+					fmt.Println("Failed to send ack to replica:", tcpConn.RemoteAddr())
 				}
-			}()
+
+				<-i.ReplicaPendingGetAck // this is probably a bad idea. synchronisation mechanism
+
+				go func() {
+					err := i.Ack(tcpConn)
+					if err != nil {
+						fmt.Println("Failed to receive ack from replica:", tcpConn.RemoteAddr())
+					}
+				}()
+			}
 		}
 	}(replica)
 }
@@ -194,7 +198,7 @@ func (i *ReplicationService) GetAck(conn net.Conn) error {
 		return err
 	}
 
-	i.ReplicaPendingAck <- true
+	i.ReplicaPendingGetAck <- true
 
 	return nil
 }
@@ -210,6 +214,7 @@ func (i *ReplicationService) Ack(conn net.Conn) error {
 			}
 			fmt.Println("Error reading ack response: ", err)
 			//Since WAIT returns the number of replicas reached both in case of failure and success
+
 			i.ReplicaAck <- true
 			continue
 		}

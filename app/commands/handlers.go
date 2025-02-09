@@ -238,6 +238,7 @@ func replConfigHandler(c Command, s RequestContext) (resp.Value, error) {
 				return resp.ErrorValue("ERR: no replica connection"), nil
 			}
 
+			fmt.Println("Replica ack received: ", replica.Conn.RemoteAddr().String())
 			replica.Ack <- true
 		}
 		return resp.FlatArrayValue(), nil

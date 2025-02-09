@@ -4,10 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"github.com/codecrafters-io/redis-starter-go/app/commands/resp"
-	"github.com/codecrafters-io/redis-starter-go/app/config"
+	"github.com/codecrafters-io/redis-starter-go/app/services"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -48,8 +50,55 @@ var DefaultHandlers = commandRouter{
 	},
 }
 
-func waitHandler(_ Command, s RequestContext) (result resp.Value, err error) {
-	return resp.IntegerValue(len(s.Info.Replicas)), nil
+func waitHandler(c Command, s RequestContext) (result resp.Value, err error) {
+	if len(c.Args) < 2 {
+		return resp.ErrorValue("ERR: not enough arguments"), nil
+	}
+
+	var (
+		acked           atomic.Int32
+		wg              sync.WaitGroup
+		replicaCount, _ = strconv.Atoi(c.Args[0])
+		timeout, _      = strconv.Atoi(c.Args[1])
+	)
+
+	if replicaCount == 0 {
+		return resp.IntegerValue(0), nil
+	}
+
+	if len(s.Replication.ReplicaPendingAck) == 0 {
+		return resp.IntegerValue(len(s.Replication.Replicas)), nil
+	}
+
+	wg.Add(replicaCount)
+
+	for i := 0; i < replicaCount; i++ {
+		go func() {
+			if <-s.Replication.ReplicaAck; true {
+				acked.Add(1)
+				wg.Done()
+				fmt.Println("Wait - Replica ack")
+			}
+		}()
+	}
+	// A timeout of 0 means to block forever.
+	done := make(chan struct{})
+
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		fmt.Println("Replicas acked")
+	case <-time.After(time.Duration(timeout) * time.Millisecond):
+		fmt.Println("Timed out waiting for replicas to ack")
+		return resp.IntegerValue(int(acked.Load())), nil
+	}
+
+	fmt.Println(acked.Load(), " replicas acked")
+	return resp.IntegerValue(int(acked.Load())), nil
 }
 
 func pingHandler(_ Command, _ RequestContext) (resp.Value, error) {
@@ -112,9 +161,9 @@ func configHandler(c Command, _ RequestContext) (result resp.Value, err error) {
 
 	switch arg {
 	case "dbfilename":
-		return resp.ArrayValue(resp.BulkStringValue(arg), resp.BulkStringValue(*config.Config.DbFilename)), nil
+		return resp.ArrayValue(resp.BulkStringValue(arg), resp.BulkStringValue(*services.Config.DbFilename)), nil
 	case "dir":
-		return resp.ArrayValue(resp.BulkStringValue(arg), resp.BulkStringValue(*config.Config.Dir)), nil
+		return resp.ArrayValue(resp.BulkStringValue(arg), resp.BulkStringValue(*services.Config.Dir)), nil
 	default:
 		return resp.ErrorValue("unknown argument"), nil
 	}
@@ -149,19 +198,21 @@ func infoHandler(c Command, context RequestContext) (resp.Value, error) {
 
 	switch arg {
 	case "replication":
-		return resp.BulkStringValue(context.Info.String()), nil
+		return resp.BulkStringValue(context.Replication.String()), nil
 	default:
 		return resp.BulkStringValue("ERR: unknown argument"), nil
 	}
 }
 
 func replConfigHandler(c Command, s RequestContext) (resp.Value, error) {
+	fmt.Println("Replconf: ", c.Args)
+
 	switch strings.ToUpper(c.Args[0]) {
 	case "GETACK":
 		return resp.ArrayValue(
 			resp.BulkStringValue("REPLCONF"),
 			resp.BulkStringValue("ACK"),
-			resp.BulkStringValue(strconv.FormatInt(s.Info.GetReplOffset(), 10)),
+			resp.BulkStringValue(strconv.FormatInt(s.Replication.GetReplOffset(), 10)),
 		), nil
 	default:
 		return resp.StringValue("OK"), nil
@@ -173,8 +224,8 @@ func pSyncHandler(c Command, s RequestContext) (resp.Value, error) {
 		resp.StringValue(
 			fmt.Sprintf(
 				"FULLRESYNC %s %v",
-				s.Info.MasterReplid,
-				"0", // s.Info.GetReplOffset()
+				s.Replication.MasterReplid,
+				"0",
 			),
 		),
 		resp.BulkLikeStringValue(s.Store.Dump()),

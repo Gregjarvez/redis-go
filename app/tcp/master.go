@@ -4,11 +4,10 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/codecrafters-io/redis-starter-go/app/commands/resp"
-	"github.com/codecrafters-io/redis-starter-go/app/config"
+	"github.com/codecrafters-io/redis-starter-go/app/services"
 	"io"
 	"net"
 	"strings"
-	"time"
 )
 
 type MasterServer struct {
@@ -63,7 +62,7 @@ func (m *MasterServer) handleConnection(rw io.ReadWriter) {
 			com := exec.Command
 
 			if strings.ToUpper(com.Type) == "PSYNC" {
-				m.Info.AddReplica(&conn)
+				m.Replication.AddReplica(conn)
 				isReplicaConnection = true
 			}
 
@@ -75,7 +74,7 @@ func (m *MasterServer) handleConnection(rw io.ReadWriter) {
 			}
 
 			if com.Propagate {
-				fmt.Println("Propagating command to replicas ", com.String())
+				fmt.Println("Propagating to replicas ", com.String())
 				m.CommandsChannel <- com.Raw
 			}
 		}
@@ -83,6 +82,7 @@ func (m *MasterServer) handleConnection(rw io.ReadWriter) {
 		content.Reset()
 		// If it's a replica connection, exit the loop
 		if isReplicaConnection {
+			fmt.Println("Replica connection detected, exiting read loop")
 			break
 		}
 	}
@@ -100,13 +100,11 @@ func (m *MasterServer) BroadCastCommands() {
 }
 
 func (m *MasterServer) Broadcast(command []byte) {
-	m.Info.ReplicaMutex.RLock()
-	defer m.Info.ReplicaMutex.RUnlock()
+	m.Replication.ReplicaMutex.RLock()
+	defer m.Replication.ReplicaMutex.RUnlock()
 
-	for _, replica := range m.Info.Replicas {
-		fmt.Println("Broadcasting command to:", (*replica.Conn).RemoteAddr())
-
-		go func(r *config.Replica) {
+	for _, replica := range m.Replication.Replicas {
+		go func(r *services.Replica) {
 			defer func() {
 				if r := recover(); r != nil {
 					fmt.Println("Recovered from panic:", r)
@@ -115,9 +113,9 @@ func (m *MasterServer) Broadcast(command []byte) {
 
 			select {
 			case r.Queue <- command:
-				fmt.Println("Command sent to replica:", (*r.Conn).RemoteAddr())
+				fmt.Println("Command sent to replica:", r.Conn.RemoteAddr())
 			default:
-				fmt.Println("Replica write queue full:", (*r.Conn).RemoteAddr())
+				fmt.Println("Replica write queue full:", r.Conn.RemoteAddr())
 			}
 
 		}(replica)
@@ -125,16 +123,6 @@ func (m *MasterServer) Broadcast(command []byte) {
 }
 
 func (m *MasterServer) Ack(conn net.Conn) {
-	if tcpConn, ok := conn.(*net.TCPConn); ok {
-		if err := tcpConn.SetKeepAlive(true); err != nil {
-			fmt.Println("Error setting keep alive: ", err)
-		}
-
-		if err := tcpConn.SetKeepAlivePeriod(3 * time.Second); err != nil {
-			fmt.Println("Error setting keep alive period: ", err)
-		}
-	}
-
 	fmt.Println("ACK")
 	v := resp.ArrayValue(
 		resp.BulkStringValue("REPLCONF"),

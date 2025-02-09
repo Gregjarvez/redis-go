@@ -1,12 +1,12 @@
 package tcp
 
 import (
-	"bufio"
 	"fmt"
 	"github.com/codecrafters-io/redis-starter-go/app/commands"
 	"github.com/codecrafters-io/redis-starter-go/app/commands/resp"
-	"github.com/codecrafters-io/redis-starter-go/app/config"
+	"github.com/codecrafters-io/redis-starter-go/app/services"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
+	"github.com/codecrafters-io/redis-starter-go/app/utils"
 	"io"
 	"net"
 	"strconv"
@@ -34,7 +34,7 @@ type BaseServer struct {
 	wg          sync.WaitGroup
 	Connections chan net.Conn
 
-	Info config.Info
+	Replication *services.ReplicationService
 
 	CommandsChannel chan []byte
 }
@@ -96,7 +96,6 @@ func (s *BaseServer) handleConnections(handleConnection func(conn io.ReadWriter)
 }
 
 func (s *BaseServer) ExecuteCommands(r io.Reader) ([]ExecutionResult, error) {
-	fmt.Println("Executing commands")
 	var (
 		results []ExecutionResult
 	)
@@ -120,19 +119,21 @@ func (s *BaseServer) ExecuteCommands(r io.Reader) ([]ExecutionResult, error) {
 			return nil, err
 		}
 
+		fmt.Println("Received command: ", com.String())
+
 		rs, err := com.Execute(commands.DefaultHandlers, commands.RequestContext{
-			Store: s.Datastore,
-			Info:  &s.Info,
+			Store:       s.Datastore,
+			Replication: s.Replication,
 		})
 
-		fmt.Printf("[%s] Processed - %s \n", strings.ToUpper(string(s.Info.Role)), com.String())
+		fmt.Printf("[%s] Processed - %s \n", strings.ToUpper(string(s.Replication.Role)), com.String())
 
 		if err != nil {
 			fmt.Println("Failed to execute command: ", err)
 			return nil, err
 		}
 
-		s.Info.IncrementReplOffset(len(com.Raw))
+		s.Replication.IncrementReplOffset(len(com.Raw))
 
 		results = append(results, ExecutionResult{
 			Results: rs,
@@ -156,7 +157,7 @@ func (s *BaseServer) WriteResults(w io.Writer, results [][]byte) error {
 		return fmt.Errorf("write main result: %w", err)
 	}
 
-	if err := flush(w); err != nil {
+	if err := utils.Flush(w); err != nil {
 		return fmt.Errorf("flush main result: %w", err)
 	}
 
@@ -166,24 +167,10 @@ func (s *BaseServer) WriteResults(w io.Writer, results [][]byte) error {
 			return fmt.Errorf("write additional result: %w", err)
 		}
 
-		if err := flush(w); err != nil {
+		if err := utils.Flush(w); err != nil {
 			return fmt.Errorf("flush additional result: %w", err)
 		}
-		//time.Sleep(10 * time.Millisecond)
 	}
 
-	return nil
-}
-
-func flush(w io.Writer) error {
-	// If the writer is part of a *bufio.ReadWriter, flush its Writer field
-	if rw, ok := w.(*bufio.ReadWriter); ok {
-		return rw.Writer.Flush()
-	}
-
-	// Otherwise, check if it's a standalone *bufio.Writer and flush
-	if bufWriter, ok := w.(*bufio.Writer); ok {
-		return bufWriter.Flush()
-	}
 	return nil
 }

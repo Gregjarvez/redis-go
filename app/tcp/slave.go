@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"github.com/codecrafters-io/redis-starter-go/app/commands"
 	"github.com/codecrafters-io/redis-starter-go/app/commands/resp"
-	"github.com/codecrafters-io/redis-starter-go/app/config"
+	"github.com/codecrafters-io/redis-starter-go/app/services"
 	"io"
 	"net"
 	"slices"
@@ -91,7 +91,7 @@ func (ss *SlaveServer) connectToMaster() {
 	var conn net.Conn
 	var err error
 
-	s := strings.Split(*config.Config.ReplicaOf, " ")
+	s := strings.Split(*services.Config.ReplicaOf, " ")
 	if conn, err = net.Dial("tcp", fmt.Sprintf("%s:%s", s[0], s[1])); err != nil {
 		panic(connectionError)
 	}
@@ -101,7 +101,7 @@ func (ss *SlaveServer) connectToMaster() {
 	rw := bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn))
 
 	ss.Ping(*rw)
-	ss.ReplConf(*rw, "listening-port", strconv.Itoa(*config.Config.Port))
+	ss.ReplConf(*rw, "listening-port", strconv.Itoa(*services.Config.Port))
 	ss.ReplConf(*rw, "capa", "eof")
 	ss.Psync(*rw)
 

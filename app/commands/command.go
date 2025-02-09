@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/codecrafters-io/redis-starter-go/app/commands/resp"
-	"github.com/codecrafters-io/redis-starter-go/app/config"
+	"github.com/codecrafters-io/redis-starter-go/app/services"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
 	"strings"
 )
@@ -17,8 +17,8 @@ type Command struct {
 }
 
 type RequestContext struct {
-	Store store.DataStore
-	Info  *config.Info
+	Store       store.DataStore
+	Replication *services.ReplicationService
 }
 
 func NewCommand(value resp.Value) (Command, error) {

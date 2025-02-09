@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/codecrafters-io/redis-starter-go/app/config"
+	"github.com/codecrafters-io/redis-starter-go/app/services"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
 	"github.com/codecrafters-io/redis-starter-go/app/tcp"
 	"log"
@@ -19,7 +19,7 @@ func main() {
 	fmt.Println("Starting server...")
 	flag.Parse()
 
-	addr := fmt.Sprintf("%s:%v", *config.Config.Host, *config.Config.Port)
+	addr := fmt.Sprintf("%s:%v", *services.Config.Host, *services.Config.Port)
 	server, err := NewTcpServer(addr)
 
 	if err != nil {
@@ -41,7 +41,7 @@ func main() {
 
 func NewTcpServer(listAddr string) (tcp.Server, error) {
 	ln, err := net.Listen("tcp", listAddr)
-	info := config.NewInfo(config.Config)
+	replication := services.NewReplicationService(services.Config)
 
 	if err != nil {
 		return nil, err
@@ -49,8 +49,8 @@ func NewTcpServer(listAddr string) (tcp.Server, error) {
 	s := store.NewMemory()
 
 	var (
-		dir        = *config.Config.Dir
-		dbFilename = *config.Config.DbFilename
+		dir        = *services.Config.Dir
+		dbFilename = *services.Config.DbFilename
 	)
 
 	if dir != "" && dbFilename != "" {
@@ -74,23 +74,23 @@ func NewTcpServer(listAddr string) (tcp.Server, error) {
 		Connections: make(chan net.Conn),
 		Shutdown:    make(chan struct{}),
 		Datastore:   s,
-		Info:        info,
+		Replication: replication,
 	}
 
-	if info.IsMaster() {
+	if replication.IsMaster() {
 		baseServer.CommandsChannel = make(chan []byte, 100)
 	}
 
-	switch info.Role {
-	case config.Master:
+	switch replication.Role {
+	case services.Master:
 		return &tcp.MasterServer{
 			BaseServer: baseServer,
 		}, nil
-	case config.Slave:
+	case services.Slave:
 		return &tcp.SlaveServer{
 			BaseServer: baseServer,
 		}, nil
 	default:
-		return nil, fmt.Errorf("unknown role: %s", info.Role)
+		return nil, fmt.Errorf("unknown role: %s", replication.Role)
 	}
 }

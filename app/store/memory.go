@@ -45,7 +45,7 @@ func (m *Memory) Write(key string, value string, params ...Options) error {
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.Store[key] = NewRecord(value, ttl)
+	m.Store[key] = NewRecord(value, ttl, "string") // other data types not implemented yet, this will always be a string
 
 	return nil
 }

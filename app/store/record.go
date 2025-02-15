@@ -7,12 +7,14 @@ import (
 type Record struct {
 	Value string
 	TTL   int64
+	Type  string
 }
 
-func NewRecord(value string, ttl int64) *Record {
+func NewRecord(value string, ttl int64, valueType string) *Record {
 	return &Record{
 		Value: value,
 		TTL:   ttl,
+		Type:  valueType,
 	}
 }
 

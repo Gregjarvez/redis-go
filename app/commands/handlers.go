@@ -47,7 +47,18 @@ var DefaultHandlers = commandRouter{
 		"PSYNC":    pSyncHandler,
 		"COMMAND":  docHandler,
 		"WAIT":     waitHandler,
+		"TYPE":     typeHandler,
 	},
+}
+
+func typeHandler(c Command, s RequestContext) (resp.Value, error) {
+	key := c.Args[0]
+
+	record := s.Store.Read(key)
+	if record == nil {
+		return resp.StringValue("none"), nil
+	}
+	return resp.StringValue(record.Type), nil
 }
 
 func waitHandler(c Command, s RequestContext) (result resp.Value, err error) {

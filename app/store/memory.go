@@ -97,18 +97,17 @@ func (m *Memory) Dump() []byte {
 }
 
 func (m *Memory) XAdd(name, id string, e [][]string) {
-	var s *stream.Stream
-
-	if _, ok := m.Store[name]; !ok {
-		s = stream.NewTrieStream(name)
-		m.Store[name] = s
-	}
-
 	entries := make(map[string]interface{})
 	for _, v := range e {
 		entries[v[0]] = v[1]
 	}
 
-	s = m.Store[name].(*stream.Stream)
-	s.Add(id, entries)
+	if trie, ok := m.Store[name]; !ok {
+		s := stream.NewTrieStream(name)
+		s.Add(id, entries)
+		m.Store[name] = s
+	} else {
+		node := trie.(*stream.Stream)
+		node.Add(id, entries)
+	}
 }

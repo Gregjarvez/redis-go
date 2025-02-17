@@ -7,7 +7,6 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/commands/resp"
 	"github.com/codecrafters-io/redis-starter-go/app/services"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
-	"slices"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -54,7 +53,7 @@ var DefaultHandlers = commandRouter{
 }
 
 func xAddHandler(c Command, s RequestContext) (result resp.Value, err error) {
-	args := slices.Collect(slices.Chunk(c.Args, 2))
+	args := Chunk(c.Args, 2)
 
 	key := args[0]
 	entries := args[1:]

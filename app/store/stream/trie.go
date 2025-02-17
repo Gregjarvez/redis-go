@@ -42,7 +42,7 @@ func (s *Stream) Add(id string, entries map[string]interface{}) {
 		if current == nil {
 			s.Value = &Node{
 				Prefix:   id,
-				Entries:  append(current.Entries, &Entry{Id: id, Elements: entries}),
+				Entries:  []*Entry{{Id: id, Elements: entries}},
 				Children: make(map[byte]*Node),
 			}
 			return

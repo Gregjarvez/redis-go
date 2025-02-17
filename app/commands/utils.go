@@ -63,3 +63,14 @@ func parseSetCommandOptions(args []string) (SetCommandOptions, error) {
 		ExpireMillis:  px,
 	}, nil
 }
+
+func Chunk[Slice ~[]T, T any](s Slice, size int) []Slice {
+	var c []Slice
+
+	for i := 0; i < len(s); i += size {
+		end := min(size, len(s[i:]))
+		c = append(c, s[i:i+end:i+end])
+	}
+
+	return c
+}

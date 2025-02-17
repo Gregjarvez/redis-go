@@ -7,6 +7,7 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/commands/resp"
 	"github.com/codecrafters-io/redis-starter-go/app/services"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
+	"slices"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -48,7 +49,23 @@ var DefaultHandlers = commandRouter{
 		"COMMAND":  docHandler,
 		"WAIT":     waitHandler,
 		"TYPE":     typeHandler,
+		"XADD":     xAddHandler,
 	},
+}
+
+func xAddHandler(c Command, s RequestContext) (result resp.Value, err error) {
+	args := slices.Collect(slices.Chunk(c.Args, 2))
+
+	key := args[0]
+	entries := args[1:]
+
+	if len(key) == 0 {
+		panic("stream has no name arguments")
+	}
+
+	s.Store.XAdd(key[0], key[1], entries)
+
+	return resp.StringValue(key[1]), nil
 }
 
 func typeHandler(c Command, s RequestContext) (resp.Value, error) {
@@ -58,7 +75,7 @@ func typeHandler(c Command, s RequestContext) (resp.Value, error) {
 	if record == nil {
 		return resp.StringValue("none"), nil
 	}
-	return resp.StringValue(record.Type), nil
+	return resp.StringValue(record.GetType()), nil
 }
 
 func waitHandler(c Command, s RequestContext) (result resp.Value, err error) {
@@ -140,7 +157,7 @@ func getHandler(c Command, context RequestContext) (resp.Value, error) {
 		return resp.BulkStringValue("", true), nil
 	}
 
-	return resp.BulkStringValue(record.String()), nil
+	return resp.BulkStringValue(record.GetValue()), nil
 }
 
 func setHandler(c Command, context RequestContext) (resp.Value, error) {

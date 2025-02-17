@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/codecrafters-io/redis-starter-go/app/rdb"
+	"github.com/codecrafters-io/redis-starter-go/app/store/stream"
 	"io"
 	"sync"
 	"time"
@@ -11,17 +12,17 @@ import (
 
 type Memory struct {
 	mu    *sync.RWMutex
-	Store map[string]*Record
+	Store map[string]Recordable
 }
 
 func NewMemory() *Memory {
 	return &Memory{
 		mu:    &sync.RWMutex{},
-		Store: make(map[string]*Record),
+		Store: make(map[string]Recordable),
 	}
 }
 
-func (m *Memory) Read(key string) *Record {
+func (m *Memory) Read(key string) Recordable {
 	v, ok := m.Store[key]
 
 	if !ok {
@@ -83,10 +84,7 @@ func (m *Memory) Hydrate(r io.Reader) error {
 			ttl = time.Unix(record.Expiry.Value, 0).UnixMilli()
 		}
 
-		m.Store[record.Key] = &Record{
-			Value: record.Value,
-			TTL:   ttl,
-		}
+		m.Store[record.Key] = NewRecord(record.Value, ttl, "string")
 	}
 
 	return nil
@@ -96,4 +94,21 @@ func (m *Memory) Dump() []byte {
 	// @todo create dump from memory store - currently just a hex encoded empty redis dump file
 	file, _ := hex.DecodeString("524544495330303131fa0972656469732d76657205372e322e30fa0a72656469732d62697473c040fa056374696d65c26d08bc65fa08757365642d6d656dc2b0c41000fa08616f662d62617365c000fff06e3bfec0ff5aa2")
 	return file
+}
+
+func (m *Memory) XAdd(name, id string, e [][]string) {
+	var s *stream.Stream
+
+	if _, ok := m.Store[name]; !ok {
+		s = stream.NewTrieStream(name)
+		m.Store[name] = s
+	}
+
+	entries := make(map[string]interface{})
+	for _, v := range e {
+		entries[v[0]] = v[1]
+	}
+
+	s = m.Store[name].(*stream.Stream)
+	s.Add(id, entries)
 }

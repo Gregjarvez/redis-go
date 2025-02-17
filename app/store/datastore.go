@@ -7,9 +7,10 @@ type Options struct {
 }
 
 type DataStore interface {
-	Read(key string) *Record
+	Read(key string) Recordable
 	Write(key string, value string, params ...Options) error
 	Keys() []string
 	Dump() []byte
 	Hydrate(r io.Reader) error
+	XAdd(name, id string, entries [][]string)
 }

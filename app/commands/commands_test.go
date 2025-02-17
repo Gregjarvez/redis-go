@@ -8,7 +8,7 @@ import (
 )
 
 func TestNewCommand(t *testing.T) {
-	t.Run("should return Command with Type and Args when input is an RESP array", func(t *testing.T) {
+	t.Run("should return Command with typ and Args when input is an RESP array", func(t *testing.T) {
 		mockInput := "*3\r\n$4\r\nPING\r\n$4\r\nKEY1\r\n$4\r\nKEY2\r\n"
 		reader := bytes.NewBufferString(mockInput)
 		value, _, _ := resp.NewReader(reader).ReadValue()
@@ -20,7 +20,7 @@ func TestNewCommand(t *testing.T) {
 		assert.Equal(t, []string{"KEY1", "KEY2"}, cmd.Args)
 	})
 
-	t.Run("should return Command with only Type when input is a single RESP value", func(t *testing.T) {
+	t.Run("should return Command with only typ when input is a single RESP value", func(t *testing.T) {
 		mockInput := "+PONG\r\n" // RESP simple string: "PONG"
 		reader := bytes.NewBufferString(mockInput)
 		value, _, _ := resp.NewReader(reader).ReadValue()

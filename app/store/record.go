@@ -4,24 +4,34 @@ import (
 	"time"
 )
 
-type Record struct {
-	Value string
-	TTL   int64
-	Type  string
+type Recordable interface {
+	GetType() string
+	GetValue() string
+	IsExpired() bool
 }
 
-func NewRecord(value string, ttl int64, valueType string) *Record {
-	return &Record{
+type SimpleRecord struct {
+	Value string
+	TTL   int64
+	typ   string
+}
+
+func NewRecord(value string, ttl int64, valueType string) *SimpleRecord {
+	return &SimpleRecord{
 		Value: value,
 		TTL:   ttl,
-		Type:  valueType,
+		typ:   valueType,
 	}
 }
 
-func (r *Record) String() string {
+func (r *SimpleRecord) IsExpired() bool {
+	return r.TTL != 0 && time.Now().UnixMilli() > r.TTL
+}
+
+func (r *SimpleRecord) GetValue() string {
 	return r.Value
 }
 
-func (r *Record) IsExpired() bool {
-	return r.TTL != 0 && time.Now().UnixMilli() > r.TTL
+func (r *SimpleRecord) GetType() string {
+	return r.typ
 }

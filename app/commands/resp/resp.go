@@ -13,7 +13,7 @@ type Reader struct {
 	size *int
 }
 
-var InvalidDataType = errors.New("invalid Data Type")
+var InvalidDataType = errors.New("invalid Data typ")
 
 func NewReader(input io.Reader) *Reader {
 	c := ByteCounter{size: 0}

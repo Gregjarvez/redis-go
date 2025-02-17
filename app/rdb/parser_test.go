@@ -25,11 +25,11 @@ func TestHeaderParsing(t *testing.T) {
 }
 
 func TestAuxFieldParsing(t *testing.T) {
-	// Mock AUX field: (AUX + Key-Length (3) + "key" + Value-Length (5) + "value")
+	// Mock AUX field: (AUX + Key-Length (3) + "key" + Entries-Length (5) + "value")
 	data := []byte{
 		AUX,                 // AUX marker
 		0x03, 'k', 'e', 'y', // Key length + "key"
-		0x05, 'v', 'a', 'l', 'u', 'e', // Value length + "value"
+		0x05, 'v', 'a', 'l', 'u', 'e', // Entries length + "value"
 	}
 	reader := bufio.NewReader(bytes.NewReader(data))
 
@@ -80,7 +80,7 @@ func TestReadString(t *testing.T) {
 	t.Run("Encoded INT8", func(t *testing.T) {
 		data := []byte{
 			REDIS_RDB_ENCVAL<<6 | REDIS_RDB_ENC_INT8, // INT8 encoding
-			42,                                       // Value: 42
+			42,                                       // Entries: 42
 		}
 
 		reader := bufio.NewReader(bytes.NewReader(data))
@@ -94,10 +94,10 @@ func TestReadString(t *testing.T) {
 }
 
 func TestReadKeyValuePair(t *testing.T) {
-	// Mock Key/Value pair: Key-Length (3) + "key" + Value-Length (5) + "value"
+	// Mock Key/Entries pair: Key-Length (3) + "key" + Entries-Length (5) + "value"
 	data := []byte{
 		0x03, 'k', 'e', 'y', // Key length + "key"
-		0x05, 'v', 'a', 'l', 'u', 'e', // Value length + "value"
+		0x05, 'v', 'a', 'l', 'u', 'e', // Entries length + "value"
 	}
 	reader := bufio.NewReader(bytes.NewReader(data))
 
@@ -105,7 +105,7 @@ func TestReadKeyValuePair(t *testing.T) {
 	kv, err := parser.readKeyValuePair(reader)
 	assert.NoError(t, err, "Reading key-value pair should not return an error")
 	assert.Equal(t, "key", kv.Key, "Key should be 'key'")
-	assert.Equal(t, "value", kv.Value, "Value should be 'value'")
+	assert.Equal(t, "value", kv.Value, "Entries should be 'value'")
 }
 
 func TestParseDumpRDBFile(t *testing.T) {

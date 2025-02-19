@@ -102,7 +102,9 @@ func (m *Memory) XAdd(name, id string, e [][]string) error {
 
 	trieNode, ok := m.Store[name].(*stream.Stream)
 	if !ok {
+		fmt.Println("Stream not found, creating new entry")
 		trieNode = stream.NewTrieStream(name)
+		m.Store[name] = trieNode
 	}
 
 	entries := make(map[string]interface{})

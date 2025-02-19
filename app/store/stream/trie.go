@@ -2,6 +2,7 @@ package stream
 
 import (
 	"errors"
+	"fmt"
 )
 
 type Entry struct {
@@ -47,6 +48,7 @@ func (s *Stream) Add(id string, entries map[string]interface{}) error {
 	err := s.validatePrefix(id)
 
 	s.length++
+	s.TailPrefix = id
 
 	if err != nil {
 		return err
@@ -152,7 +154,9 @@ func (s *Stream) Get(id string) *Entry {
 }
 
 func (s *Stream) validatePrefix(id string) error {
-	if s.length == 0 && id <= "0-0" {
+	fmt.Println("Validating prefix: ", id, " length: ", s.length, " tailPrefix: ", s.TailPrefix)
+
+	if id <= "0-0" {
 		return errors.New("ERR The ID specified in XADD must be greater than 0-0")
 	}
 

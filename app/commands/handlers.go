@@ -62,6 +62,8 @@ func xAddHandler(c Command, s RequestContext) (resp.Value, error) {
 		panic("stream has no name arguments")
 	}
 
+	fmt.Println("XADD: ", key[0], key[1], entries)
+
 	if err := s.Store.XAdd(key[0], key[1], entries); err != nil {
 		return resp.ErrorValue(err.Error()), nil
 	}

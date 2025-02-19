@@ -96,18 +96,19 @@ func (m *Memory) Dump() []byte {
 	return file
 }
 
-func (m *Memory) XAdd(name, id string, e [][]string) {
+func (m *Memory) XAdd(name, id string, e [][]string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	trieNode, ok := m.Store[name].(*stream.Stream)
+	if !ok {
+		trieNode = stream.NewTrieStream(name)
+	}
+
 	entries := make(map[string]interface{})
 	for _, v := range e {
 		entries[v[0]] = v[1]
 	}
 
-	if trie, ok := m.Store[name]; !ok {
-		s := stream.NewTrieStream(name)
-		s.Add(id, entries)
-		m.Store[name] = s
-	} else {
-		node := trie.(*stream.Stream)
-		node.Add(id, entries)
-	}
+	return trieNode.Add(id, entries)
 }

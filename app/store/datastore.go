@@ -12,5 +12,5 @@ type DataStore interface {
 	Keys() []string
 	Dump() []byte
 	Hydrate(r io.Reader) error
-	XAdd(name, id string, entries [][]string)
+	XAdd(name, id string, entries [][]string) error
 }

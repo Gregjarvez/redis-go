@@ -1,5 +1,9 @@
 package stream
 
+import (
+	"errors"
+)
+
 type Entry struct {
 	Id       string
 	Elements map[string]interface{}
@@ -13,8 +17,10 @@ type Node struct {
 
 // Stream  Compressed prefix tree.
 type Stream struct {
-	Name  string
-	Value *Node
+	Name       string
+	Value      *Node
+	TailPrefix string
+	length     int64
 }
 
 func (s *Stream) GetType() string {
@@ -36,8 +42,16 @@ func NewTrieStream(name string) *Stream {
 	}
 }
 
-func (s *Stream) Add(id string, entries map[string]interface{}) {
+func (s *Stream) Add(id string, entries map[string]interface{}) error {
 	current := s.Value
+	err := s.validatePrefix(id)
+
+	s.length++
+
+	if err != nil {
+		return err
+	}
+
 	for {
 		if current == nil {
 			s.Value = &Node{
@@ -45,7 +59,7 @@ func (s *Stream) Add(id string, entries map[string]interface{}) {
 				Entries:  []*Entry{{Id: id, Elements: entries}},
 				Children: make(map[byte]*Node),
 			}
-			return
+			return nil
 		}
 
 		commonPrefix := longestCommonPrefix(id, current.Prefix)
@@ -77,7 +91,7 @@ func (s *Stream) Add(id string, entries map[string]interface{}) {
 			} else {
 				current.Entries = append(current.Entries, &Entry{Id: id, Elements: entries})
 			}
-			return
+			return nil
 		}
 
 		id = id[len(commonPrefix):]
@@ -90,7 +104,7 @@ func (s *Stream) Add(id string, entries map[string]interface{}) {
 					{Id: id, Elements: entries},
 				},
 			}
-			return
+			return nil
 		}
 
 		current = child
@@ -98,6 +112,7 @@ func (s *Stream) Add(id string, entries map[string]interface{}) {
 }
 
 func (s *Stream) Get(id string) *Entry {
+	entryId := id
 	current := s.Value
 	/*
 		Say we need to find the entry for with id computer
@@ -115,10 +130,10 @@ func (s *Stream) Get(id string) *Entry {
 			return nil
 		}
 
-		commonPrefix := longestCommonPrefix(id, current.Prefix)
-		id = id[len(commonPrefix):]
+		commonPrefix := longestCommonPrefix(entryId, current.Prefix)
+		entryId = entryId[len(commonPrefix):]
 
-		if len(id) == 0 {
+		if len(entryId) == 0 {
 			for _, entry := range current.Entries {
 				if entry.Id == id {
 					return entry
@@ -127,13 +142,25 @@ func (s *Stream) Get(id string) *Entry {
 			return nil
 		}
 
-		child, exists := current.Children[id[0]]
+		child, exists := current.Children[entryId[0]]
 		if !exists {
 			return nil
 		}
 
 		current = child
 	}
+}
+
+func (s *Stream) validatePrefix(id string) error {
+	if s.length == 0 && id <= "0-0" {
+		return errors.New("ERR The ID specified in XADD must be greater than 0-0")
+	}
+
+	if id <= s.TailPrefix {
+		return errors.New("ERR The ID specified in XADD is equal or smaller than the target stream top item")
+	}
+
+	return nil
 }
 
 func longestCommonPrefix(a, b string) string {

@@ -52,7 +52,7 @@ var DefaultHandlers = commandRouter{
 	},
 }
 
-func xAddHandler(c Command, s RequestContext) (result resp.Value, err error) {
+func xAddHandler(c Command, s RequestContext) (resp.Value, error) {
 	args := Chunk(c.Args, 2)
 
 	key := args[0]
@@ -62,7 +62,9 @@ func xAddHandler(c Command, s RequestContext) (result resp.Value, err error) {
 		panic("stream has no name arguments")
 	}
 
-	s.Store.XAdd(key[0], key[1], entries)
+	if err := s.Store.XAdd(key[0], key[1], entries); err != nil {
+		return resp.ErrorValue(err.Error()), nil
+	}
 
 	return resp.StringValue(key[1]), nil
 }

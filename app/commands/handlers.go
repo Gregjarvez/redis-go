@@ -70,7 +70,11 @@ func xAddHandler(c Command, s RequestContext) (resp.Value, error) {
 		return resp.ErrorValue(err.Error()), nil
 	}
 
-	return resp.StringValue(k), nil
+	if k != key[0] {
+		return resp.BulkStringValue(k), nil
+	}
+
+	return resp.StringValue(key[0]), nil
 }
 
 func typeHandler(c Command, s RequestContext) (resp.Value, error) {

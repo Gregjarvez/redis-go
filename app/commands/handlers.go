@@ -64,11 +64,13 @@ func xAddHandler(c Command, s RequestContext) (resp.Value, error) {
 
 	fmt.Println("XADD: ", key[0], key[1], entries)
 
-	if err := s.Store.XAdd(key[0], key[1], entries); err != nil {
+	k, err := s.Store.XAdd(key[0], key[1], entries)
+
+	if err != nil {
 		return resp.ErrorValue(err.Error()), nil
 	}
 
-	return resp.StringValue(key[1]), nil
+	return resp.StringValue(k), nil
 }
 
 func typeHandler(c Command, s RequestContext) (resp.Value, error) {

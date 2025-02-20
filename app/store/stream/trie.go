@@ -3,6 +3,9 @@ package stream
 import (
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
+	"time"
 )
 
 type Entry struct {
@@ -38,21 +41,28 @@ func (s *Stream) IsExpired() bool {
 
 func NewTrieStream(name string) *Stream {
 	return &Stream{
-		Name:  name,
-		Value: nil,
+		Name:       name,
+		Value:      nil,
+		TailPrefix: "0-0",
+		length:     0,
 	}
 }
 
-func (s *Stream) Add(id string, entries map[string]interface{}) error {
+func (s *Stream) Add(id string, entries map[string]interface{}) (string, error) {
 	current := s.Value
+
+	if strings.Contains(id, "*") {
+		id = s.formatPrefix(id)
+	}
+
 	err := s.validatePrefix(id)
+
+	if err != nil {
+		return id, err
+	}
 
 	s.length++
 	s.TailPrefix = id
-
-	if err != nil {
-		return err
-	}
 
 	for {
 		if current == nil {
@@ -61,7 +71,7 @@ func (s *Stream) Add(id string, entries map[string]interface{}) error {
 				Entries:  []*Entry{{Id: id, Elements: entries}},
 				Children: make(map[byte]*Node),
 			}
-			return nil
+			return id, nil
 		}
 
 		commonPrefix := longestCommonPrefix(id, current.Prefix)
@@ -93,7 +103,7 @@ func (s *Stream) Add(id string, entries map[string]interface{}) error {
 			} else {
 				current.Entries = append(current.Entries, &Entry{Id: id, Elements: entries})
 			}
-			return nil
+			return id, nil
 		}
 
 		id = id[len(commonPrefix):]
@@ -106,7 +116,7 @@ func (s *Stream) Add(id string, entries map[string]interface{}) error {
 					{Id: id, Elements: entries},
 				},
 			}
-			return nil
+			return id, nil
 		}
 
 		current = child
@@ -165,6 +175,40 @@ func (s *Stream) validatePrefix(id string) error {
 	}
 
 	return nil
+}
+
+func (s *Stream) nextSeq(p string) string {
+	tailPrefix := strings.Split(s.TailPrefix, "-")
+	prefix := strings.Split(p, "-")
+
+	if tailPrefix[0] == prefix[0] {
+		sq, err := strconv.ParseInt(tailPrefix[1], 10, 64)
+		if err != nil {
+			return ""
+		}
+		sq++
+		return strconv.FormatInt(sq, 10)
+	}
+
+	return "0"
+}
+
+func (s *Stream) formatPrefix(prefix string) string {
+	if prefix == "*" {
+		return fmt.Sprintf("%d-%s", time.Now().UnixMilli(), "0")
+	}
+
+	segments := strings.Split(prefix, "-")
+	var (
+		id = segments[0]
+		sq = segments[1]
+	)
+
+	if sq == "*" {
+		sq = s.nextSeq(prefix)
+	}
+
+	return fmt.Sprintf("%s-%s", id, sq)
 }
 
 func longestCommonPrefix(a, b string) string {

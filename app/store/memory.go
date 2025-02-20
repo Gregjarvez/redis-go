@@ -96,7 +96,7 @@ func (m *Memory) Dump() []byte {
 	return file
 }
 
-func (m *Memory) XAdd(name, id string, e [][]string) error {
+func (m *Memory) XAdd(name, id string, e [][]string) (string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 

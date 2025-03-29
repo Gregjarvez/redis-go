@@ -181,6 +181,10 @@ func (s *Stream) Range(start, end string) []*Entry {
 		return nil
 	}
 
+	if start == "-" {
+		start = s.Value.Prefix
+	}
+
 	if end == "+" {
 		end = s.TailPrefix
 	}

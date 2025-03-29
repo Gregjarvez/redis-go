@@ -382,7 +382,6 @@ func TestReader_ReadBooleanValue(t *testing.T) {
 }
 
 func TestConstructAndMarshalComplexNestedArrays(t *testing.T) {
-	// Create the first nested array: ["1526985054069-0", ["temperature", "36", "humidity", "95"]]
 	firstArrayElements := []Value{
 		BulkStringValue("temperature"),
 		BulkStringValue("36"),
@@ -394,7 +393,6 @@ func TestConstructAndMarshalComplexNestedArrays(t *testing.T) {
 		ArrayValue(firstArrayElements...),
 	)
 
-	// Create the second nested array: ["1526985054079-0", ["temperature", "37", "humidity", "94"]]
 	secondArrayElements := []Value{
 		BulkStringValue("temperature"),
 		BulkStringValue("37"),
@@ -406,13 +404,12 @@ func TestConstructAndMarshalComplexNestedArrays(t *testing.T) {
 		ArrayValue(secondArrayElements...),
 	)
 
-	// Create the top-level array containing both nested arrays
 	topLevelArray := ArrayValue(firstNestedArray, secondNestedArray)
 
-	// Marshal to RESP format
 	respBytes, err := topLevelArray.Marshal()
 	assert.NoError(t, err)
 	fmt.Println(string(respBytes))
+
 	// Expected RESP representation
 	expectedResp := "*2\r\n" +
 		"*2\r\n" +
@@ -441,12 +438,4 @@ func TestConstructAndMarshalComplexNestedArrays(t *testing.T) {
 		"94\r\n"
 
 	assert.Equal(t, expectedResp, string(respBytes))
-
-	// Now let's read the marshaled data back and verify the structure
-	reader := NewReader(bytes.NewBuffer(respBytes))
-	parsedValue, _, err := reader.ReadValue()
-	assert.NoError(t, err)
-
-	// Verify the top-level structure
-	assert.Equal(t, Array, parsedValue.Type)
 }

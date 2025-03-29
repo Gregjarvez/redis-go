@@ -181,6 +181,10 @@ func (s *Stream) Range(start, end string) []*Entry {
 		return nil
 	}
 
+	if end == "+" {
+		end = s.TailPrefix
+	}
+
 	var result []*Entry
 
 	stack := []*Node{s.Value}

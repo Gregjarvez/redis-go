@@ -3,6 +3,7 @@ package resp
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -378,4 +379,74 @@ func TestReader_ReadBooleanValue(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestConstructAndMarshalComplexNestedArrays(t *testing.T) {
+	// Create the first nested array: ["1526985054069-0", ["temperature", "36", "humidity", "95"]]
+	firstArrayElements := []Value{
+		BulkStringValue("temperature"),
+		BulkStringValue("36"),
+		BulkStringValue("humidity"),
+		BulkStringValue("95"),
+	}
+	firstNestedArray := ArrayValue(
+		BulkStringValue("1526985054069-0"),
+		ArrayValue(firstArrayElements...),
+	)
+
+	// Create the second nested array: ["1526985054079-0", ["temperature", "37", "humidity", "94"]]
+	secondArrayElements := []Value{
+		BulkStringValue("temperature"),
+		BulkStringValue("37"),
+		BulkStringValue("humidity"),
+		BulkStringValue("94"),
+	}
+	secondNestedArray := ArrayValue(
+		BulkStringValue("1526985054079-0"),
+		ArrayValue(secondArrayElements...),
+	)
+
+	// Create the top-level array containing both nested arrays
+	topLevelArray := ArrayValue(firstNestedArray, secondNestedArray)
+
+	// Marshal to RESP format
+	respBytes, err := topLevelArray.Marshal()
+	assert.NoError(t, err)
+	fmt.Println(string(respBytes))
+	// Expected RESP representation
+	expectedResp := "*2\r\n" +
+		"*2\r\n" +
+		"$14\r\n" +
+		"1526985054069-0\r\n" +
+		"*4\r\n" +
+		"$11\r\n" +
+		"temperature\r\n" +
+		"$2\r\n" +
+		"36\r\n" +
+		"$8\r\n" +
+		"humidity\r\n" +
+		"$2\r\n" +
+		"95\r\n" +
+		"*2\r\n" +
+		"$14\r\n" +
+		"1526985054079-0\r\n" +
+		"*4\r\n" +
+		"$11\r\n" +
+		"temperature\r\n" +
+		"$2\r\n" +
+		"37\r\n" +
+		"$8\r\n" +
+		"humidity\r\n" +
+		"$2\r\n" +
+		"94\r\n"
+
+	assert.Equal(t, expectedResp, string(respBytes))
+
+	// Now let's read the marshaled data back and verify the structure
+	reader := NewReader(bytes.NewBuffer(respBytes))
+	parsedValue, _, err := reader.ReadValue()
+	assert.NoError(t, err)
+
+	// Verify the top-level structure
+	assert.Equal(t, Array, parsedValue.Type)
 }

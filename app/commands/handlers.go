@@ -7,6 +7,7 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/commands/resp"
 	"github.com/codecrafters-io/redis-starter-go/app/services"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
+	"github.com/codecrafters-io/redis-starter-go/app/store/stream"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -49,7 +50,39 @@ var DefaultHandlers = commandRouter{
 		"WAIT":     waitHandler,
 		"TYPE":     typeHandler,
 		"XADD":     xAddHandler,
+		"XRANGE":   xRangeHandler,
 	},
+}
+
+func xRangeHandler(c Command, s RequestContext) (resp.Value, error) {
+	key := c.Args[0]
+	start := c.Args[1]
+	end := c.Args[2]
+
+	fmt.Println("XRANGE: ", key, start, end)
+
+	trie := s.Store.Read(key).(*stream.Stream)
+
+	if trie == nil {
+		fmt.Println("Stream not found")
+		return resp.NullValue(), nil
+	}
+
+	result := trie.Range(start, end)
+	r := make([]resp.Value, 0, len(result))
+
+	for _, entry := range result {
+		id := resp.BulkStringValue(entry.Id)
+		values := make([]resp.Value, 0, 2*len(entry.Elements))
+
+		for k, v := range entry.Elements {
+			values = append(values, resp.BulkStringValue(k), resp.BulkStringValue(fmt.Sprintf("%v", v)))
+		}
+
+		r = append(r, resp.ArrayValue(id, resp.ArrayValue(values...)))
+	}
+
+	return resp.ArrayValue(r...), nil
 }
 
 func xAddHandler(c Command, s RequestContext) (resp.Value, error) {

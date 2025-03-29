@@ -3,6 +3,7 @@ package stream
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -50,6 +51,7 @@ func NewTrieStream(name string) *Stream {
 
 func (s *Stream) Add(id string, entries map[string]interface{}) (string, error) {
 	current := s.Value
+	entryId := id
 
 	if strings.Contains(id, "*") {
 		id = s.formatPrefix(id)
@@ -93,25 +95,29 @@ func (s *Stream) Add(id string, entries map[string]interface{}) (string, error) 
 				child.Prefix[0]: child,
 			}
 
-			if len(id) > len(commonPrefix) {
-				current.Children[id[len(commonPrefix)]] = &Node{
-					Prefix: id[len(commonPrefix):],
+			if len(entryId) > len(commonPrefix) {
+				current.Children[entryId[len(commonPrefix)]] = &Node{
+					Prefix: entryId[len(commonPrefix):],
 					Entries: []*Entry{
-						{Id: id, Elements: entries},
+						{Id: entryId, Elements: entries},
 					},
 				}
 			} else {
-				current.Entries = append(current.Entries, &Entry{Id: id, Elements: entries})
+				current.Entries = append(current.Entries, &Entry{Id: entryId, Elements: entries})
 			}
 			return id, nil
 		}
 
-		id = id[len(commonPrefix):]
-		child, exists := current.Children[id[0]]
+		entryId = entryId[len(commonPrefix):]
+		child, exists := current.Children[entryId[0]]
 
 		if !exists {
-			current.Children[id[0]] = &Node{
-				Prefix: id,
+			if current.Children == nil {
+				current.Children = make(map[byte]*Node)
+			}
+
+			current.Children[entryId[0]] = &Node{
+				Prefix: entryId,
 				Entries: []*Entry{
 					{Id: id, Elements: entries},
 				},
@@ -155,12 +161,55 @@ func (s *Stream) Get(id string) *Entry {
 		}
 
 		child, exists := current.Children[entryId[0]]
+
 		if !exists {
 			return nil
 		}
 
+		for _, entry := range child.Entries {
+			if entry.Id == entryId {
+				return entry
+			}
+		}
+
 		current = child
 	}
+}
+
+func (s *Stream) Range(start, end string) []*Entry {
+	if s.Value == nil {
+		return nil
+	}
+
+	var result []*Entry
+
+	stack := []*Node{s.Value}
+
+	for len(stack) > 0 {
+		current := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+
+		for _, entry := range current.Entries {
+			if entry.Id >= start && entry.Id <= end {
+				result = append(result, entry)
+			}
+		}
+
+		var keys []byte
+		for b := range current.Children {
+			keys = append(keys, b)
+		}
+
+		sort.Slice(keys, func(i, j int) bool {
+			return keys[i] > keys[j]
+		})
+
+		for _, b := range keys {
+			stack = append(stack, current.Children[b])
+		}
+	}
+
+	return result
 }
 
 func (s *Stream) validatePrefix(id string) error {

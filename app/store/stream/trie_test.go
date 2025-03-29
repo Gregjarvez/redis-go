@@ -51,6 +51,11 @@ func TestAddWithCommonPrefix(t *testing.T) {
 	}
 	trie.Add(id2, entries2)
 
+	id3 := "common-key3"
+	entries3 := map[string]interface{}{"field3": "value3"}
+
+	trie.Add(id3, entries3)
+
 	// Assertions
 	assert.NotNil(t, trie.Value, "Root node should be initialized")
 	assert.Equal(t, "common-key", trie.Value.Prefix, "Root node prefix mismatch with common prefix")
@@ -67,6 +72,12 @@ func TestAddWithCommonPrefix(t *testing.T) {
 	assert.Equal(t, child2.Prefix, "2", "Child node '2' prefix mismatch")
 	assert.Len(t, child2.Entries, 1, "Child node '2' should have exactly 1 entry")
 	assert.Equal(t, child2.Entries[0].Id, id2, "Child node '2' entry ID mismatch")
+
+	child3, exists3 := trie.Value.Children['3']
+	assert.True(t, exists3, "Child node '3' should exist")
+	assert.Equal(t, child3.Prefix, "3", "Child node '3' prefix mismatch")
+	assert.Len(t, child3.Entries, 1, "Child node '3' should have exactly 1 entry")
+	assert.Equal(t, child3.Entries[0].Id, id3, "Child node '3' entry ID mismatch")
 }
 
 func TestGet(t *testing.T) {
@@ -123,9 +134,9 @@ func TestAddAndRetrieveComplex(t *testing.T) {
 	trie := NewTrieStream("test-stream")
 
 	// Add entries with nested common prefixes
-	trie.Add("alpha", map[string]interface{}{"field": "value-a"})
-	trie.Add("alphabet", map[string]interface{}{"field": "value-ab"})
-	trie.Add("alphabets", map[string]interface{}{"field": "value-abs"})
+	_, _ = trie.Add("alpha", map[string]interface{}{"field": "value-a"})
+	_, _ = trie.Add("alphabet", map[string]interface{}{"field": "value-ab"})
+	_, _ = trie.Add("alphabets", map[string]interface{}{"field": "value-abs"})
 
 	// Retrieve each specific item
 	entry := trie.Get("alpha")
@@ -139,4 +150,21 @@ func TestAddAndRetrieveComplex(t *testing.T) {
 	entry = trie.Get("alphabets")
 	assert.NotNil(t, entry, "Expected to find 'alphabets'")
 	assert.Equal(t, "value-abs", entry.Elements["field"], "Field value mismatch for 'alphabets'")
+}
+
+func TestStreamRange(t *testing.T) {
+	trie := NewTrieStream("test-stream")
+
+	_, _ = trie.Add("0-1", map[string]interface{}{"field": "value-a"})
+	_, _ = trie.Add("0-2", map[string]interface{}{"field": "value-a"})
+	_, _ = trie.Add("0-3", map[string]interface{}{"field": "value-a"})
+
+	// Retrieve range
+	entries := trie.Range("0-1", "0-3")
+
+	for _, entry := range entries {
+		t.Logf("Entry: %v", entry)
+	}
+
+	assert.Len(t, entries, 3, "Expected 3 entries in range")
 }

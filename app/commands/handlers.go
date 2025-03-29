@@ -51,7 +51,53 @@ var DefaultHandlers = commandRouter{
 		"TYPE":     typeHandler,
 		"XADD":     xAddHandler,
 		"XRANGE":   xRangeHandler,
+		"XREAD":    xReadHandler,
 	},
+}
+
+func xReadHandler(c Command, s RequestContext) (resp.Value, error) {
+	if len(c.Args) < 3 {
+		return resp.ErrorValue("ERR wrong number of arguments for 'xread' command"), nil
+	}
+
+	key := c.Args[1]
+	id := c.Args[2]
+
+	fmt.Println("XREAD: streams", key, id)
+
+	streamObj := s.Store.Read(key)
+
+	if streamObj == nil {
+		fmt.Println("Stream not found")
+		return resp.NullValue(), nil
+	}
+
+	stream, _ := streamObj.(*stream.Stream)
+
+	entries := stream.XRead(id)
+
+	if len(entries) == 0 {
+		return resp.NullValue(), nil
+	}
+
+	r := make([]resp.Value, 0, len(entries))
+
+	for _, entry := range entries {
+		e := make([]resp.Value, 0, 2*len(entry.Elements))
+
+		for k, v := range entry.Elements {
+			e = append(e, resp.BulkStringValue(k), resp.BulkStringValue(fmt.Sprintf("%v", v)))
+		}
+
+		r = append(r, resp.ArrayValue(resp.BulkStringValue(entry.Id), resp.ArrayValue(e...)))
+	}
+
+	return resp.ArrayValue(
+		resp.ArrayValue(
+			resp.BulkStringValue(key),
+			resp.ArrayValue(r...),
+		),
+	), nil
 }
 
 func xRangeHandler(c Command, s RequestContext) (resp.Value, error) {

@@ -220,6 +220,23 @@ func (s *Stream) Range(start, end string) []*Entry {
 	return result
 }
 
+func (s *Stream) XRead(id string) []*Entry {
+	if s.Value == nil {
+		return nil
+	}
+
+	results := s.Range(id, "+")
+
+	var filteredResults []*Entry
+	for _, entry := range results {
+		if entry.Id > id {
+			filteredResults = append(filteredResults, entry)
+		}
+	}
+
+	return filteredResults
+}
+
 func (s *Stream) validatePrefix(id string) error {
 	fmt.Println("Validating prefix: ", id, " length: ", s.length, " tailPrefix: ", s.TailPrefix)
 

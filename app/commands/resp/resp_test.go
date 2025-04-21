@@ -439,3 +439,12 @@ func TestConstructAndMarshalComplexNestedArrays(t *testing.T) {
 
 	assert.Equal(t, expectedResp, string(respBytes))
 }
+
+func TestNestedComplexArrays(t *testing.T) {
+	input := "*2\r\n*2\r\n$3\r\n0-2\r\n*2\r\n$8\r\nhumidity\r\n$1\r\n2\r\n*2\r\n$6\r\nbanana\r\n*1\r\n*2\r\n$3\r\n0-2\r\n*2\r\n$8\r\nhumidity\r\n$1\r\n2\r\n"
+	reader := NewReader(bytes.NewBufferString(input))
+	value, _, err := reader.ReadValue()
+
+	assert.NoError(t, err)
+	assert.Equal(t, Array, value.Type)
+}

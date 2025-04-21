@@ -56,48 +56,55 @@ var DefaultHandlers = commandRouter{
 }
 
 func xReadHandler(c Command, s RequestContext) (resp.Value, error) {
-	if len(c.Args) < 3 {
-		return resp.ErrorValue("ERR wrong number of arguments for 'xread' command"), nil
+	keys, ids := splitArray(c.Args[1:])
+	fmt.Println("XREAD: ", c.Args)
+
+	args := make(map[string]string, len(keys))
+
+	for i, k := range keys {
+		args[k] = ids[i]
 	}
 
-	key := c.Args[1]
-	id := c.Args[2]
+	result := make([]resp.Value, 0, len(args))
 
-	fmt.Println("XREAD: streams", key, id)
+	for streamKey, entryKey := range args {
+		streamObj := s.Store.Read(streamKey)
 
-	streamObj := s.Store.Read(key)
-
-	if streamObj == nil {
-		fmt.Println("Stream not found")
-		return resp.NullValue(), nil
-	}
-
-	stream, _ := streamObj.(*stream.Stream)
-
-	entries := stream.XRead(id)
-
-	if len(entries) == 0 {
-		return resp.NullValue(), nil
-	}
-
-	r := make([]resp.Value, 0, len(entries))
-
-	for _, entry := range entries {
-		e := make([]resp.Value, 0, 2*len(entry.Elements))
-
-		for k, v := range entry.Elements {
-			e = append(e, resp.BulkStringValue(k), resp.BulkStringValue(fmt.Sprintf("%v", v)))
+		if streamObj == nil {
+			fmt.Println("Stream not found")
+			return resp.NullValue(), nil
 		}
 
-		r = append(r, resp.ArrayValue(resp.BulkStringValue(entry.Id), resp.ArrayValue(e...)))
+		stream, _ := streamObj.(*stream.Stream)
+
+		entries := stream.XRead(entryKey)
+
+		if len(entries) == 0 {
+			return resp.NullValue(), nil
+		} // @todo fix this
+
+		r := make([]resp.Value, 0, len(entries))
+
+		for _, entry := range entries {
+			e := make([]resp.Value, 0, 2*len(entry.Elements))
+
+			for k, v := range entry.Elements {
+				e = append(e, resp.BulkStringValue(k), resp.BulkStringValue(fmt.Sprintf("%v", v)))
+			}
+
+			r = append(r, resp.ArrayValue(resp.BulkStringValue(entry.Id), resp.ArrayValue(e...)))
+		}
+
+		result = append(
+			result,
+			resp.ArrayValue(
+				resp.BulkStringValue(streamKey),
+				resp.ArrayValue(r...),
+			),
+		)
 	}
 
-	return resp.ArrayValue(
-		resp.ArrayValue(
-			resp.BulkStringValue(key),
-			resp.ArrayValue(r...),
-		),
-	), nil
+	return resp.ArrayValue(result...), nil
 }
 
 func xRangeHandler(c Command, s RequestContext) (resp.Value, error) {

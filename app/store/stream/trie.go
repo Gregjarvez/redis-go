@@ -220,16 +220,16 @@ func (s *Stream) Range(start, end string) []*Entry {
 	return result
 }
 
-func (s *Stream) XRead(id string) []*Entry {
+func (s *Stream) XRead(start string) []*Entry {
 	if s.Value == nil {
 		return nil
 	}
 
-	results := s.Range(id, "+")
+	results := s.Range(start, "+")
 
 	var filteredResults []*Entry
 	for _, entry := range results {
-		if entry.Id > id {
+		if entry.Id > start {
 			filteredResults = append(filteredResults, entry)
 		}
 	}

@@ -74,3 +74,32 @@ func Chunk[Slice ~[]T, T any](s Slice, size int) []Slice {
 
 	return c
 }
+
+func Zip[T, U any](a []T, b []U) []struct {
+	First  T
+	Second U
+} {
+	length := len(a)
+	if len(b) < length {
+		length = len(b)
+	}
+
+	result := make([]struct {
+		First  T
+		Second U
+	}, length)
+	for i := 0; i < length; i++ {
+		result[i] = struct {
+			First  T
+			Second U
+		}{a[i], b[i]}
+	}
+	return result
+}
+
+func splitArray(arr []string) (firstHalf []string, secondHalf []string) {
+	middle := len(arr) / 2
+	firstHalf = arr[:middle]
+	secondHalf = arr[middle:]
+	return
+}

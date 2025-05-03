@@ -67,6 +67,13 @@ func BulkStringValue(s string, isNil ...bool) Value {
 	}
 }
 
+func BulkNullStringValue() Value {
+	return Value{
+		Type:  BulkString,
+		IsNil: true,
+	}
+}
+
 func ArrayValue(values ...Value) Value {
 	return Value{
 		Type:   Array,
@@ -185,6 +192,11 @@ func (v *Value) Marshal() ([]byte, error) {
 func (v *Value) format() []byte {
 	var b bytes.Buffer
 	b.WriteString(string(v.Type))
+
+	if v.Type == BulkString && v.IsNil {
+		b.WriteString("$-1\r\n")
+		return b.Bytes()
+	}
 
 	if v.Type == BulkString {
 		b.WriteString(fmt.Sprintf("%d\r\n", len(v.Raw)))

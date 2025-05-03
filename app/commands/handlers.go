@@ -8,6 +8,7 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/services"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
 	"github.com/codecrafters-io/redis-starter-go/app/store/stream"
+	"slices"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -56,23 +57,33 @@ var DefaultHandlers = commandRouter{
 }
 
 func xReadHandler(c Command, s RequestContext) (resp.Value, error) {
-	keys, ids := splitArray(c.Args[1:])
 	fmt.Println("XREAD: ", c.Args)
 
-	args := make(map[string]string, len(keys))
+	var block int64
+	index := 1
 
-	for i, k := range keys {
-		args[k] = ids[i]
+	if strings.ToLower(c.Args[0]) == "block" {
+		block, _ = strconv.ParseInt(c.Args[1], 10, 64)
+		index = slices.Index(c.Args, "streams") + 1
 	}
 
-	result := make([]resp.Value, 0, len(args))
+	if block > 0 {
+		fmt.Println("XREAD: blocking for ", block, " milliseconds")
+		time.Sleep(time.Duration(block) * time.Millisecond)
+	}
 
-	for streamKey, entryKey := range args {
+	keys, ids := splitArray(c.Args[index:])
+	fmt.Println("XREAD: keys: ", keys, " ids: ", ids)
+
+	result := make([]resp.Value, 0, len(keys))
+
+	for i, streamKey := range keys {
 		streamObj := s.Store.Read(streamKey)
+		entryKey := ids[i]
 
 		if streamObj == nil {
-			fmt.Println("Stream not found")
-			return resp.NullValue(), nil
+			fmt.Printf("Stream not found %v, %v /n", streamKey, entryKey)
+			return resp.BulkNullStringValue(), nil
 		}
 
 		stream, _ := streamObj.(*stream.Stream)
@@ -80,8 +91,8 @@ func xReadHandler(c Command, s RequestContext) (resp.Value, error) {
 		entries := stream.XRead(entryKey)
 
 		if len(entries) == 0 {
-			return resp.NullValue(), nil
-		} // @todo fix this
+			return resp.BulkNullStringValue(), nil
+		}
 
 		r := make([]resp.Value, 0, len(entries))
 

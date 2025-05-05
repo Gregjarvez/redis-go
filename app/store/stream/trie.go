@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -20,12 +21,19 @@ type Node struct {
 	Children map[byte]*Node
 }
 
+type Notification struct {
+	key string
+}
+
 // Stream  Compressed prefix tree.
 type Stream struct {
 	Name       string
 	Value      *Node
 	TailPrefix string
 	length     int64
+
+	subscribers   map[chan<- Notification]struct{}
+	subscribersMu sync.RWMutex
 }
 
 func (s *Stream) GetType() string {
@@ -65,6 +73,8 @@ func (s *Stream) Add(id string, entries map[string]interface{}) (string, error) 
 
 	s.length++
 	s.TailPrefix = id
+
+	defer s.notifySubscribers(id)
 
 	for {
 		if current == nil {
@@ -129,12 +139,47 @@ func (s *Stream) Add(id string, entries map[string]interface{}) (string, error) 
 	}
 }
 
+func (s *Stream) Subscribe(ch chan<- Notification) {
+	s.subscribersMu.Lock()
+	defer s.subscribersMu.Unlock()
+
+	if s.subscribers == nil {
+		s.subscribers = make(map[chan<- Notification]struct{})
+	}
+
+	s.subscribers[ch] = struct{}{}
+}
+
+func (s *Stream) Unsubscribe(ch chan<- Notification) {
+	s.subscribersMu.Lock()
+	defer s.subscribersMu.Unlock()
+
+	if s.subscribers != nil {
+		delete(s.subscribers, ch)
+	}
+}
+
+func (s *Stream) notifySubscribers(key string) {
+	s.subscribersMu.RLock()
+	defer s.subscribersMu.RUnlock()
+
+	notification := Notification{
+		key: key,
+	}
+
+	for ch := range s.subscribers {
+		select {
+		case ch <- notification:
+		default:
+		}
+	}
+}
+
 func (s *Stream) Get(id string) *Entry {
 	entryId := id
 	current := s.Value
 	/*
-		Say we need to find the entry for with id computer
-		get the longest common prefix
+		Say we need to find the entry for with id computer gets the longest common prefix
 		compare the lcp to the current node lcp
 		if they do not match. id is not in the trie
 

@@ -8,7 +8,6 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/services"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
 	"github.com/codecrafters-io/redis-starter-go/app/store/stream"
-	"slices"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -59,12 +58,31 @@ var DefaultHandlers = commandRouter{
 func xReadHandler(c Command, s RequestContext) (resp.Value, error) {
 	fmt.Println("XREAD: ", c.Args)
 
-	var block int64
-	index := 1
+	keys, ids, block := parseXReadArgs(c.Args)
+	fmt.Println("XREAD: keys: ", keys, " ids: ", ids, " block: ", block)
 
-	if strings.ToLower(c.Args[0]) == "block" {
-		block, _ = strconv.ParseInt(c.Args[1], 10, 64)
-		index = slices.Index(c.Args, "streams") + 1
+	if block == 0 {
+		notifyCh := make(chan stream.Notification, len(keys))
+
+		for _, streamKey := range keys {
+			streamObj := s.Store.Read(streamKey)
+			if streamObj == nil {
+				continue
+			}
+
+			stream, ok := streamObj.(*stream.Stream)
+			if ok {
+				stream.Subscribe(notifyCh)
+				defer stream.Unsubscribe(notifyCh)
+			}
+		}
+
+		fmt.Println("XREAD: blocking indefinitely")
+
+		for {
+			<-notifyCh
+			return readStreams(keys, ids, s.Store)
+		}
 	}
 
 	if block > 0 {
@@ -72,13 +90,14 @@ func xReadHandler(c Command, s RequestContext) (resp.Value, error) {
 		time.Sleep(time.Duration(block) * time.Millisecond)
 	}
 
-	keys, ids := splitArray(c.Args[index:])
-	fmt.Println("XREAD: keys: ", keys, " ids: ", ids)
+	return readStreams(keys, ids, s.Store)
+}
 
+func readStreams(keys, ids []string, store store.DataStore) (resp.Value, error) {
 	result := make([]resp.Value, 0, len(keys))
 
 	for i, streamKey := range keys {
-		streamObj := s.Store.Read(streamKey)
+		streamObj := store.Read(streamKey)
 		entryKey := ids[i]
 
 		if streamObj == nil {

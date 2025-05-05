@@ -103,3 +103,35 @@ func splitArray(arr []string) (firstHalf []string, secondHalf []string) {
 	secondHalf = arr[middle:]
 	return
 }
+
+func parseXReadArgs(args []string) (keys, ids []string, block int64) {
+	block = -1
+	index := 0
+
+	if len(args) >= 3 && strings.ToLower(args[0]) == "block" {
+		blockVal, err := strconv.ParseInt(args[1], 10, 64)
+		if err == nil {
+			block = blockVal
+		}
+
+		for i, arg := range args {
+			if strings.ToLower(arg) == "streams" {
+				index = i + 1
+				break
+			}
+		}
+	} else {
+		for i, arg := range args {
+			if strings.ToLower(arg) == "streams" {
+				index = i + 1
+				break
+			}
+		}
+	}
+
+	if index > 0 && index < len(args) {
+		keys, ids = splitArray(args[index:])
+	}
+
+	return keys, ids, block
+}

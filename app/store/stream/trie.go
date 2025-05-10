@@ -167,6 +167,8 @@ func (s *Stream) notifySubscribers(key string) {
 		key: key,
 	}
 
+	fmt.Println("Notifying subscribers: ", s.subscribers)
+
 	for ch := range s.subscribers {
 		select {
 		case ch <- notification:
@@ -228,6 +230,10 @@ func (s *Stream) Range(start, end string) []*Entry {
 
 	if start == "-" {
 		start = s.Value.Prefix
+	}
+
+	if start == "$" {
+		start = s.TailPrefix
 	}
 
 	if end == "+" {

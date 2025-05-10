@@ -2,6 +2,10 @@ package commands
 
 import (
 	"errors"
+	"fmt"
+	"github.com/codecrafters-io/redis-starter-go/app/commands/resp"
+	"github.com/codecrafters-io/redis-starter-go/app/store"
+	"github.com/codecrafters-io/redis-starter-go/app/store/stream"
 	"slices"
 	"strconv"
 	"strings"
@@ -134,4 +138,99 @@ func parseXReadArgs(args []string) (keys, ids []string, block int64) {
 	}
 
 	return keys, ids, block
+}
+
+func handleBlockingRead(keys, ids []string, store store.DataStore) (resp.Value, error) {
+	notifyCh := make(chan stream.Notification, len(keys))
+
+	subscriptions := subscribeToStreams(keys, store, notifyCh)
+	defer func() {
+		for _, stream := range subscriptions {
+			stream.Unsubscribe(notifyCh)
+		}
+	}()
+
+	<-notifyCh
+
+	return readStreams(keys, ids, store)
+}
+
+func subscribeToStreams(keys []string, store store.DataStore, notifyCh chan stream.Notification) []*stream.Stream {
+	subscriptions := make([]*stream.Stream, 0, len(keys))
+
+	for _, streamKey := range keys {
+		streamObj := store.Read(streamKey)
+		if streamObj == nil {
+			continue
+		}
+
+		stream, ok := streamObj.(*stream.Stream)
+		if ok {
+			stream.Subscribe(notifyCh)
+			subscriptions = append(subscriptions, stream)
+		}
+	}
+
+	return subscriptions
+}
+
+func readStreams(keys, ids []string, store store.DataStore) (resp.Value, error) {
+	result := make([]resp.Value, 0, len(keys))
+
+	for i, streamKey := range keys {
+		streamObj := store.Read(streamKey)
+		entryKey := ids[i]
+
+		if streamObj == nil {
+			return resp.BulkNullStringValue(), nil
+		}
+
+		stream, ok := streamObj.(*stream.Stream)
+		if !ok {
+			return resp.BulkNullStringValue(), nil
+		}
+
+		entries := stream.XRead(entryKey)
+		if len(entries) == 0 {
+			return resp.BulkNullStringValue(), nil
+		}
+
+		entriesValues := formatStreamEntries(entries)
+
+		result = append(
+			result,
+			resp.ArrayValue(
+				resp.BulkStringValue(streamKey),
+				resp.ArrayValue(entriesValues...),
+			),
+		)
+	}
+
+	return resp.ArrayValue(result...), nil
+}
+
+func formatStreamEntries(entries []*stream.Entry) []resp.Value {
+	entriesValues := make([]resp.Value, 0, len(entries))
+
+	for _, entry := range entries {
+		entryElements := make([]resp.Value, 0, 2*len(entry.Elements))
+
+		for k, v := range entry.Elements {
+			entryElements = append(
+				entryElements,
+				resp.BulkStringValue(k),
+				resp.BulkStringValue(fmt.Sprintf("%v", v)),
+			)
+		}
+
+		entriesValues = append(
+			entriesValues,
+			resp.ArrayValue(
+				resp.BulkStringValue(entry.Id),
+				resp.ArrayValue(entryElements...),
+			),
+		)
+	}
+
+	return entriesValues
 }

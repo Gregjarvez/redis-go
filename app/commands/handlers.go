@@ -8,6 +8,7 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/services"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
 	"github.com/codecrafters-io/redis-starter-go/app/store/stream"
+	"slices"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -55,86 +56,31 @@ var DefaultHandlers = commandRouter{
 	},
 }
 
+const (
+	blocking int64 = 0
+)
+
 func xReadHandler(c Command, s RequestContext) (resp.Value, error) {
-	fmt.Println("XREAD: ", c.Args)
+	keys, ids, blockMillis := parseXReadArgs(c.Args)
 
-	keys, ids, block := parseXReadArgs(c.Args)
-	fmt.Println("XREAD: keys: ", keys, " ids: ", ids, " block: ", block)
-
-	if block == 0 {
-		notifyCh := make(chan stream.Notification, len(keys))
-
-		for _, streamKey := range keys {
-			streamObj := s.Store.Read(streamKey)
-			if streamObj == nil {
-				continue
-			}
-
-			stream, ok := streamObj.(*stream.Stream)
-			if ok {
-				stream.Subscribe(notifyCh)
-				defer stream.Unsubscribe(notifyCh)
-			}
-		}
-
-		fmt.Println("XREAD: blocking indefinitely")
-
-		for {
-			<-notifyCh
-			return readStreams(keys, ids, s.Store)
-		}
+	if blockMillis == blocking {
+		return handleBlockingRead(keys, ids, s.Store)
 	}
 
-	if block > 0 {
-		fmt.Println("XREAD: blocking for ", block, " milliseconds")
-		time.Sleep(time.Duration(block) * time.Millisecond)
+	if blockMillis > 0 {
+		if slices.Contains(ids, "$") {
+			sto := s.Store.Read(keys[0])
+			stream, ok := sto.(*stream.Stream)
+
+			if ok {
+				ids[0] = stream.TailPrefix
+			}
+		}
+
+		time.Sleep(time.Duration(blockMillis) * time.Millisecond)
 	}
 
 	return readStreams(keys, ids, s.Store)
-}
-
-func readStreams(keys, ids []string, store store.DataStore) (resp.Value, error) {
-	result := make([]resp.Value, 0, len(keys))
-
-	for i, streamKey := range keys {
-		streamObj := store.Read(streamKey)
-		entryKey := ids[i]
-
-		if streamObj == nil {
-			fmt.Printf("Stream not found %v, %v /n", streamKey, entryKey)
-			return resp.BulkNullStringValue(), nil
-		}
-
-		stream, _ := streamObj.(*stream.Stream)
-
-		entries := stream.XRead(entryKey)
-
-		if len(entries) == 0 {
-			return resp.BulkNullStringValue(), nil
-		}
-
-		r := make([]resp.Value, 0, len(entries))
-
-		for _, entry := range entries {
-			e := make([]resp.Value, 0, 2*len(entry.Elements))
-
-			for k, v := range entry.Elements {
-				e = append(e, resp.BulkStringValue(k), resp.BulkStringValue(fmt.Sprintf("%v", v)))
-			}
-
-			r = append(r, resp.ArrayValue(resp.BulkStringValue(entry.Id), resp.ArrayValue(e...)))
-		}
-
-		result = append(
-			result,
-			resp.ArrayValue(
-				resp.BulkStringValue(streamKey),
-				resp.ArrayValue(r...),
-			),
-		)
-	}
-
-	return resp.ArrayValue(result...), nil
 }
 
 func xRangeHandler(c Command, s RequestContext) (resp.Value, error) {

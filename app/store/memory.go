@@ -6,6 +6,7 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/rdb"
 	"github.com/codecrafters-io/redis-starter-go/app/store/stream"
 	"io"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -113,4 +114,31 @@ func (m *Memory) XAdd(name, id string, e [][]string) (string, error) {
 	}
 
 	return trieNode.Add(id, entries)
+}
+
+func (m *Memory) Increment(key string) (int64, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	v, ok := m.Store[key]
+	if !ok || v == nil || v.IsExpired() {
+		m.Store[key] = NewRecord(strconv.FormatInt(1, 10), 0, "string")
+		return 1, nil
+	}
+
+	i, err := strconv.ParseInt(v.GetValue(), 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("value for key %s is not a valid integer: %w", key, err)
+	}
+
+	res := i + 1
+	m.Store[key] = NewRecord(strconv.FormatInt(res, 10), 0, "string")
+
+	return res, nil
+}
+
+func (m *Memory) storeIntValue(key string, value int64) (int64, error) {
+	m.Store[key] = NewRecord(strconv.FormatInt(value, 10), 0, "string")
+
+	return value, nil
 }

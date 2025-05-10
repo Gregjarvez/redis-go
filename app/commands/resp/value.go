@@ -43,10 +43,10 @@ func StringValue(s string) Value {
 	}
 }
 
-func IntegerValue(i int) Value {
+func IntegerValue(i int64) Value {
 	return Value{
 		Type:  Integer,
-		Raw:   []byte(strconv.Itoa(i)),
+		Raw:   []byte(strconv.FormatInt(i, 10)),
 		IsNil: i == 0,
 	}
 }

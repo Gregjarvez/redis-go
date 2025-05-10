@@ -17,6 +17,10 @@ This project leverages **Go'store networking** and **concurrency features** to s
     - `COMMAND` for documentation purposes.
       - `DOCS`- Server documentation. Currently just returns Welcome
     - `WAIT` - Replica consistency - This command blocks the current client until all the previous write commands are successfully transferred and acknowledged by at least the number of replicas you specify in the numreplicas argument.
+    - `TYPE` - Returns the data type of the value stored at a key. Returns "none" if the key does not exist.
+    - `XADD` - Adds an entry to a stream. Takes a key, an ID, and field-value pairs.
+    - `XRANGE` - Returns the stream entries with IDs matching the specified range.
+    - `XREAD` - Reads from one or more streams, with optional blocking behavior if no items are available.
 
 
 ## Prerequisites
@@ -99,6 +103,39 @@ Retrieve configurations:
 ```bash
 > COMMAND docs
 "Welcome"
+```
+
+### TYPE:
+```bash
+> TYPE mykey
+"string"
+```
+
+### XADD:
+```bash
+> XADD mystream * field1 value1 field2 value2
+"1698766401000-0"
+```
+
+### XRANGE:
+```bash
+> XRANGE mystream - +
+1) 1) "1698766401000-0"
+   2) 1) "field1"
+      2) "value1"
+      3) "field2"
+      4) "value2"
+```
+
+### XREAD:
+```bash
+> XREAD COUNT 2 STREAMS mystream 0
+1) 1) "mystream"
+   2) 1) 1) "1698766401000-0"
+         2) 1) "field1"
+            2) "value1"
+            3) "field2"
+            4) "value2"
 ```
 
 ## Replication

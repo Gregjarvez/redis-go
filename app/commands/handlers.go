@@ -53,7 +53,20 @@ var DefaultHandlers = commandRouter{
 		"XADD":     xAddHandler,
 		"XRANGE":   xRangeHandler,
 		"XREAD":    xReadHandler,
+		"INCR":     incrHandler,
 	},
+}
+
+func incrHandler(c Command, s RequestContext) (resp.Value, error) {
+	key := c.Args[0]
+
+	v, err := s.Store.Increment(key)
+
+	if err != nil {
+		return resp.ErrorValue(err.Error()), nil
+	}
+
+	return resp.IntegerValue(v), nil
 }
 
 const (
@@ -166,7 +179,7 @@ func waitHandler(c Command, s RequestContext) (result resp.Value, err error) {
 
 	// check documentation
 	if len(s.Store.Keys()) == 0 {
-		return resp.IntegerValue(len(s.Replication.Replicas)), nil
+		return resp.IntegerValue(int64(len(s.Replication.Replicas))), nil
 	}
 
 	replicas := s.Replication.Replicas
@@ -204,7 +217,7 @@ func waitHandler(c Command, s RequestContext) (result resp.Value, err error) {
 	finalAcked := acked.Load()
 	fmt.Println("Final acked count:", finalAcked)
 
-	return resp.IntegerValue(int(finalAcked)), nil
+	return resp.IntegerValue(int64(finalAcked)), nil
 }
 
 func pingHandler(_ Command, _ RequestContext) (resp.Value, error) {

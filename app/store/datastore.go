@@ -13,4 +13,5 @@ type DataStore interface {
 	Dump() []byte
 	Hydrate(r io.Reader) error
 	XAdd(name, id string, entries [][]string) (string, error)
+	Increment(key string) (int64, error)
 }

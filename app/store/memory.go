@@ -128,7 +128,7 @@ func (m *Memory) Increment(key string) (int64, error) {
 
 	i, err := strconv.ParseInt(v.GetValue(), 10, 64)
 	if err != nil {
-		return 0, fmt.Errorf("value for key %s is not a valid integer: %w", key, err)
+		return 0, fmt.Errorf("ERR value is not an integer or out of range")
 	}
 
 	res := i + 1

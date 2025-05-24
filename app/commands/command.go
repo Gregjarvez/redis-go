@@ -21,6 +21,8 @@ type RequestContext struct {
 	Store       store.DataStore
 	Replication *services.ReplicationService
 	Conn        net.Conn
+
+	Transaction *services.TransactionService
 }
 
 func NewCommand(value resp.Value) (Command, error) {

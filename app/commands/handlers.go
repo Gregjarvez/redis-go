@@ -54,7 +54,22 @@ var DefaultHandlers = commandRouter{
 		"XRANGE":   xRangeHandler,
 		"XREAD":    xReadHandler,
 		"INCR":     incrHandler,
+		"MULTI":    multiHandler,
 	},
+}
+
+func multiHandler(c Command, s RequestContext) (resp.Value, error) {
+	if s.Transaction.IsTransaction(s.Conn) {
+		return resp.ErrorValue("ERR MULTI calls can not be nested"), nil
+	}
+
+	err := s.Transaction.Begin(s.Conn)
+
+	if err != nil {
+		return resp.ErrorValue(err.Error()), nil
+	}
+
+	return resp.StringValue("OK"), nil
 }
 
 func incrHandler(c Command, s RequestContext) (resp.Value, error) {

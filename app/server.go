@@ -75,6 +75,8 @@ func NewTcpServer(listAddr string) (tcp.Server, error) {
 		Shutdown:    make(chan struct{}),
 		Datastore:   s,
 		Replication: replication,
+
+		Transactions: services.NewTransactionService(),
 	}
 
 	if replication.IsMaster() {

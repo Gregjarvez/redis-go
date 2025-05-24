@@ -37,6 +37,7 @@ type BaseServer struct {
 	Replication *services.ReplicationService
 
 	CommandsChannel chan []byte
+	Transactions    *services.TransactionService
 }
 
 func (s *BaseServer) StartListener(handleConnection func(conn io.ReadWriter)) {
@@ -125,6 +126,8 @@ func (s *BaseServer) ExecuteCommands(r io.Reader, conn net.Conn) ([]ExecutionRes
 			Store:       s.Datastore,
 			Replication: s.Replication,
 			Conn:        conn,
+
+			Transaction: s.Transactions,
 		})
 
 		fmt.Printf("[%s] Processed - %s \n", strings.ToUpper(string(s.Replication.Role)), com.String())

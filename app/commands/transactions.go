@@ -50,3 +50,32 @@ func (t *TransactionService) IsTransaction(conn net.Conn) bool {
 	_, exists := t.transactions[conn]
 	return exists
 }
+
+func (t *TransactionService) Commit(conn net.Conn) error {
+	t.tmu.Lock()
+	defer t.tmu.Unlock()
+
+	if transaction, exists := t.transactions[conn]; exists {
+		if transaction.isExecuted {
+			return fmt.Errorf("transaction already committed for this connection")
+		}
+
+		transaction.isExecuted = true
+		delete(t.transactions, conn)
+		return nil
+	}
+
+	return fmt.Errorf("no active transaction for this connection")
+}
+
+func (t *TransactionService) AddCommand(conn net.Conn, command []byte) error {
+	t.tmu.Lock()
+	defer t.tmu.Unlock()
+
+	if transaction, exists := t.transactions[conn]; exists {
+		transaction.queue = append(transaction.queue, command...)
+		return nil
+	}
+
+	return fmt.Errorf("no active transaction for this connection")
+}

@@ -70,6 +70,10 @@ func execHandler(c Command, s RequestContext) (resp.Value, error) {
 
 	response, err := s.Transaction.Commit(s.Conn, s)
 
+	if response == nil {
+		return resp.ArrayValue(), err
+	}
+
 	return resp.ArrayValue(response...), err
 
 }

@@ -80,7 +80,7 @@ func (t *TransactionService) Commit(conn net.Conn, req RequestContext) ([]resp.V
 		return response, nil
 	}
 
-	return nil, fmt.Errorf("no active transaction for this connection")
+	return nil, nil
 }
 
 func (t *TransactionService) AddCommand(conn net.Conn, c *Command) error {

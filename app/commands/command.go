@@ -66,7 +66,7 @@ func isPropagatedCommand(c string) bool {
 func (c *Command) Execute(handler commandRouter, s RequestContext) ([][]byte, error) {
 	var responses [][]byte
 
-	if s.Transaction.IsTransaction(s.Conn) {
+	if s.Transaction.IsTransaction(s.Conn) && c.Type != "EXEC" && c.Type != "MULTI" {
 		if err := s.Transaction.AddCommand(s.Conn, c); err != nil {
 			return nil, err
 		}

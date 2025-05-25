@@ -7,6 +7,7 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/services"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
 	"net"
+	"slices"
 	"strings"
 )
 
@@ -23,6 +24,12 @@ type RequestContext struct {
 	Conn        net.Conn
 
 	Transaction *TransactionService
+}
+
+var transactionCommands = []string{
+	"MULTI",
+	"EXEC",
+	"DISCARD",
 }
 
 func NewCommand(value resp.Value) (Command, error) {
@@ -66,7 +73,7 @@ func isPropagatedCommand(c string) bool {
 func (c *Command) Execute(handler commandRouter, s RequestContext) ([][]byte, error) {
 	var responses [][]byte
 
-	if s.Transaction.IsTransaction(s.Conn) && c.Type != "EXEC" && c.Type != "MULTI" {
+	if s.Transaction.IsTransaction(s.Conn) && !slices.Contains(transactionCommands, c.Type) {
 		if err := s.Transaction.AddCommand(s.Conn, c); err != nil {
 			return nil, err
 		}

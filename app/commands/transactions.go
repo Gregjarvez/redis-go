@@ -94,3 +94,15 @@ func (t *TransactionService) AddCommand(conn net.Conn, c *Command) error {
 
 	return fmt.Errorf("no active transaction for this connection")
 }
+
+func (t *TransactionService) Discard(conn net.Conn) error {
+	t.tmu.Lock()
+	defer t.tmu.Unlock()
+
+	if _, exists := t.transactions[conn]; exists {
+		delete(t.transactions, conn)
+		return nil
+	}
+
+	return fmt.Errorf("ERR DISCARD without MULTI")
+}

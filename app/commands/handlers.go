@@ -42,6 +42,7 @@ func NewCommandRouter() commandRouter {
 			"INCR":     incrHandler,
 			"MULTI":    multiHandler,
 			"EXEC":     execHandler,
+			"DISCARD":  discardHandler,
 		},
 	}
 }
@@ -62,6 +63,20 @@ func (c *commandRouter) Handle(cmd Command, s RequestContext) (resp.Value, error
 }
 
 var DefaultHandlers = NewCommandRouter()
+
+func discardHandler(c Command, s RequestContext) (resp.Value, error) {
+	if !s.Transaction.IsTransaction(s.Conn) {
+		return resp.ErrorValue("ERR DISCARD without MULTI"), nil
+	}
+
+	err := s.Transaction.Discard(s.Conn)
+
+	if err != nil {
+		return resp.ErrorValue("ERR DISCARD without MULTI"), nil
+	}
+
+	return resp.StringValue("OK"), nil
+}
 
 func execHandler(c Command, s RequestContext) (resp.Value, error) {
 	if !s.Transaction.IsTransaction(s.Conn) {

@@ -21,6 +21,31 @@ type commandRouter struct {
 	handlers map[string]commandHandler
 }
 
+func NewCommandRouter() commandRouter {
+	return commandRouter{
+		handlers: map[string]commandHandler{
+			"PING":     pingHandler,
+			"ECHO":     echoHandler,
+			"SET":      setHandler,
+			"GET":      getHandler,
+			"CONFIG":   configHandler,
+			"KEYS":     keysHandler,
+			"INFO":     infoHandler,
+			"REPLCONF": replConfigHandler,
+			"PSYNC":    pSyncHandler,
+			"COMMAND":  docHandler,
+			"WAIT":     waitHandler,
+			"TYPE":     typeHandler,
+			"XADD":     xAddHandler,
+			"XRANGE":   xRangeHandler,
+			"XREAD":    xReadHandler,
+			"INCR":     incrHandler,
+			"MULTI":    multiHandler,
+			"EXEC":     execHandler,
+		},
+	}
+}
+
 func (c *commandRouter) canHandle(cmd string) bool {
 	_, ok := c.handlers[cmd]
 	return ok
@@ -36,26 +61,17 @@ func (c *commandRouter) Handle(cmd Command, s RequestContext) (resp.Value, error
 	return c.handlers[typ](cmd, s)
 }
 
-var DefaultHandlers = commandRouter{
-	handlers: map[string]commandHandler{
-		"PING":     pingHandler,
-		"ECHO":     echoHandler,
-		"SET":      setHandler,
-		"GET":      getHandler,
-		"CONFIG":   configHandler,
-		"KEYS":     keysHandler,
-		"INFO":     infoHandler,
-		"REPLCONF": replConfigHandler,
-		"PSYNC":    pSyncHandler,
-		"COMMAND":  docHandler,
-		"WAIT":     waitHandler,
-		"TYPE":     typeHandler,
-		"XADD":     xAddHandler,
-		"XRANGE":   xRangeHandler,
-		"XREAD":    xReadHandler,
-		"INCR":     incrHandler,
-		"MULTI":    multiHandler,
-	},
+var DefaultHandlers = NewCommandRouter()
+
+func execHandler(c Command, s RequestContext) (resp.Value, error) {
+	if !s.Transaction.IsTransaction(s.Conn) {
+		return resp.ErrorValue("ERR EXEC without MULTI"), nil
+	}
+
+	response, err := s.Transaction.Commit(s.Conn, s)
+
+	return resp.ArrayValue(response...), err
+
 }
 
 func multiHandler(c Command, s RequestContext) (resp.Value, error) {

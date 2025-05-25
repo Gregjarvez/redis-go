@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/codecrafters-io/redis-starter-go/app/commands"
 	"github.com/codecrafters-io/redis-starter-go/app/services"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
 	"github.com/codecrafters-io/redis-starter-go/app/tcp"
@@ -76,7 +77,7 @@ func NewTcpServer(listAddr string) (tcp.Server, error) {
 		Datastore:   s,
 		Replication: replication,
 
-		Transactions: services.NewTransactionService(),
+		Transactions: commands.NewTransactionService(),
 	}
 
 	if replication.IsMaster() {

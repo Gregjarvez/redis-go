@@ -22,7 +22,7 @@ type RequestContext struct {
 	Replication *services.ReplicationService
 	Conn        net.Conn
 
-	Transaction *services.TransactionService
+	Transaction *TransactionService
 }
 
 func NewCommand(value resp.Value) (Command, error) {
@@ -64,13 +64,25 @@ func isPropagatedCommand(c string) bool {
 }
 
 func (c *Command) Execute(handler commandRouter, s RequestContext) ([][]byte, error) {
+	var responses [][]byte
+
+	if s.Transaction.IsTransaction(s.Conn) {
+		if err := s.Transaction.AddCommand(s.Conn, c); err != nil {
+			return nil, err
+		}
+
+		value := resp.BulkStringValue("QUEUED")
+		v, _ := value.Marshal()
+
+		responses = append(responses, v)
+		return responses, nil
+	}
+
 	res, err := handler.Handle(*c, s)
 
 	if err != nil {
 		return nil, err
 	}
-
-	var responses [][]byte
 
 	if res.Type == resp.Array && res.Flatten {
 		for _, v := range res.Values {

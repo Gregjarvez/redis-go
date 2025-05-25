@@ -37,7 +37,7 @@ type BaseServer struct {
 	Replication *services.ReplicationService
 
 	CommandsChannel chan []byte
-	Transactions    *services.TransactionService
+	Transactions    *commands.TransactionService
 }
 
 func (s *BaseServer) StartListener(handleConnection func(conn io.ReadWriter)) {
